@@ -1,11 +1,13 @@
-import {
-  StyleSheet, View, Text, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ScrollView,
-} from 'react-native';
-import { useState } from 'react';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import {
+    KeyboardAvoidingView, Platform, ScrollView,
+    StyleSheet,
+    Text, TextInput, TouchableOpacity,
+    View,
+} from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
