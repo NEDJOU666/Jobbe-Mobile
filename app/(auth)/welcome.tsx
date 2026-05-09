@@ -1,6 +1,8 @@
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, AppState } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { useEvent } from 'expo';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
@@ -11,8 +13,9 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { LogoReveal } from '@/components/LogoReveal';
 
 const { height, width } = Dimensions.get('window');
 
@@ -25,10 +28,32 @@ export default function WelcomeScreen() {
     p.play();
   });
 
+  const appStateRef = useRef(AppState.currentState);
+  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
+
+  useEffect(() => {
+    activateKeepAwakeAsync('video-bg').catch(() => {});
+    return () => { deactivateKeepAwake('video-bg'); };
+  }, []);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      const t = setTimeout(() => { player.play(); }, 200);
+      return () => clearTimeout(t);
+    }
+  }, [isPlaying]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (appStateRef.current.match(/inactive|background/) && next === 'active') {
+        player.play();
+      }
+      appStateRef.current = next;
+    });
+    return () => sub.remove();
+  }, []);
+
   // Animation values
-  const logoOpacity = useSharedValue(0);
-  const logoY = useSharedValue(20);
-  const taglineOpacity = useSharedValue(0);
   const headlineOpacity = useSharedValue(0);
   const headlineY = useSharedValue(24);
   const subtitleOpacity = useSharedValue(0);
@@ -37,11 +62,6 @@ export default function WelcomeScreen() {
   const btn2Opacity = useSharedValue(0);
   const btn2Y = useSharedValue(16);
 
-  const logoStyle = useAnimatedStyle(() => ({
-    opacity: logoOpacity.value,
-    transform: [{ translateY: logoY.value }],
-  }));
-  const taglineStyle = useAnimatedStyle(() => ({ opacity: taglineOpacity.value }));
   const headlineStyle = useAnimatedStyle(() => ({
     opacity: headlineOpacity.value,
     transform: [{ translateY: headlineY.value }],
@@ -58,11 +78,6 @@ export default function WelcomeScreen() {
 
   useEffect(() => {
     const ease = Easing.out(Easing.cubic);
-
-    logoOpacity.value = withDelay(300, withTiming(1, { duration: 700 }));
-    logoY.value = withDelay(300, withTiming(0, { duration: 700, easing: ease }));
-
-    taglineOpacity.value = withDelay(700, withTiming(1, { duration: 600 }));
 
     headlineOpacity.value = withDelay(900, withTiming(1, { duration: 600 }));
     headlineY.value = withDelay(900, withTiming(0, { duration: 600, easing: ease }));
@@ -100,15 +115,7 @@ export default function WelcomeScreen() {
 
       {/* ── Logo (centered on video) ── */}
       <View style={styles.logoWrapper}>
-        <Animated.View style={[styles.logoInner, logoStyle]}>
-          <View style={styles.logoRow}>
-            <Text style={styles.logoText}>JOBFINDER</Text>
-            <View style={styles.logoDot} />
-          </View>
-        </Animated.View>
-        <Animated.Text style={[styles.logoTagline, taglineStyle]}>
-          YOUR CAREER, YOUR TERMS
-        </Animated.Text>
+        <LogoReveal />
       </View>
 
       {/* ── Bottom content ── */}
@@ -180,34 +187,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingBottom: 12,
-  },
-  logoInner: {
-    alignItems: 'center',
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
-  logoText: {
-    fontSize: 44,
-    fontWeight: '900',
-    color: '#fff',
-    letterSpacing: 3,
-  },
-  logoDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#14A800',
-    marginBottom: 9,
-    marginLeft: 3,
-  },
-  logoTagline: {
-    marginTop: 8,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.55)',
-    letterSpacing: 2.5,
-    fontWeight: '600',
   },
 
   // ── Bottom content ──

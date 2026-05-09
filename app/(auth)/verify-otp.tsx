@@ -1,102 +1,69 @@
 import {
-  StyleSheet, View, Text, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform,
+  StyleSheet, View, Text, TouchableOpacity,
+  KeyboardAvoidingView, Platform, ScrollView, TextInput, Alert,
 } from 'react-native';
-import { useRef, useState, useEffect } from 'react';
-import Animated, {
-  FadeInDown,
-  useSharedValue,
-  useAnimatedStyle,
-  withSequence,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import { useState } from 'react';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@/hooks/useAuth';
 
-const CODE_LENGTH = 6;
+export default function VerifyOtpScreen() {
+  const { verifyEmail, sendVerificationOtp, isLoading } = useAuth();
+  const [otp, setOtp] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
 
-export default function VerifyOTPScreen() {
-  const [otp, setOtp] = useState<string[]>(Array(CODE_LENGTH).fill(''));
-  const [focusedIndex, setFocusedIndex] = useState(0);
-  const [countdown, setCountdown] = useState(59);
-  const [canResend, setCanResend] = useState(false);
-  const inputRefs = useRef<(TextInput | null)[]>(Array(CODE_LENGTH).fill(null));
-
-  // Per-box scale animation values (declared individually — no hooks in loops)
-  const s0 = useSharedValue(1);
-  const s1 = useSharedValue(1);
-  const s2 = useSharedValue(1);
-  const s3 = useSharedValue(1);
-  const s4 = useSharedValue(1);
-  const s5 = useSharedValue(1);
-  const scales = [s0, s1, s2, s3, s4, s5];
-
-  const boxStyles = scales.map((s) =>
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }))
-  );
-
-  useEffect(() => {
-    const t = setTimeout(() => inputRefs.current[0]?.focus(), 300);
-    return () => clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
-    if (countdown === 0) { setCanResend(true); return; }
-    const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [countdown]);
-
-  const popBox = (index: number) => {
-    scales[index].value = withSequence(
-      withSpring(1.18, { damping: 6, stiffness: 200 }),
-      withSpring(1, { damping: 10 })
-    );
-  };
-
-  const handleChange = (text: string, index: number) => {
-    const char = text.replace(/[^0-9]/g, '').slice(-1);
-    const next = [...otp];
-    next[index] = char;
-    setOtp(next);
-    if (char) {
-      popBox(index);
-      if (index < CODE_LENGTH - 1) inputRefs.current[index + 1]?.focus();
+  const handleVerify = async () => {
+    if (otp.length !== 6) {
+      Alert.alert('Error', 'Please enter a 6-digit code');
+      return;
+    }
+    try {
+      await verifyEmail(otp);
+      Alert.alert('Success', 'Email verified!', [
+        { text: 'OK', onPress: () => router.replace('/(tabs)') }
+      ]);
+    } catch (err: any) {
+      Alert.alert('Verification Failed', 'Invalid code. Please try again.');
     }
   };
 
-  const handleKeyPress = (e: { nativeEvent: { key: string } }, index: number) => {
-    if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
-      const next = [...otp];
-      next[index - 1] = '';
-      setOtp(next);
-      inputRefs.current[index - 1]?.focus();
+  const handleResend = async () => {
+    try {
+      await sendVerificationOtp();
+      Alert.alert('Success', 'Code sent to your email');
+      setResendCooldown(60);
+      const timer = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err: any) {
+      Alert.alert('Error', 'Failed to send code. Please try again.');
     }
   };
-
-  const handleResend = () => {
-    setCountdown(59);
-    setCanResend(false);
-    setOtp(Array(CODE_LENGTH).fill(''));
-    setTimeout(() => inputRefs.current[0]?.focus(), 100);
-  };
-
-  const isComplete = otp.every((d) => d !== '');
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Header */}
-      <Animated.View entering={FadeInDown.delay(0).duration(400)} style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
-        </TouchableOpacity>
-      </Animated.View>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Back button */}
+        <Animated.View entering={FadeInDown.delay(0).duration(400)}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
+          </TouchableOpacity>
+        </Animated.View>
 
-      <View style={styles.content}>
         {/* Logo */}
         <Animated.View entering={FadeInDown.delay(80).duration(500)} style={styles.logoArea}>
           <View style={styles.logoRow}>
@@ -105,90 +72,79 @@ export default function VerifyOTPScreen() {
           </View>
         </Animated.View>
 
-        {/* Icon + Title */}
-        <Animated.View entering={FadeInDown.delay(180).duration(500)} style={styles.titleArea}>
+        {/* Icon */}
+        <Animated.View entering={FadeInDown.delay(150).duration(500)} style={styles.iconArea}>
           <View style={styles.iconWrapper}>
-            <Ionicons name="mail-outline" size={30} color="#14A800" />
+            <Ionicons name="mail-outline" size={40} color="#14A800" />
           </View>
+        </Animated.View>
+
+        {/* Title */}
+        <Animated.View entering={FadeInDown.delay(220).duration(500)}>
           <Text style={styles.title}>Verify your email</Text>
           <Text style={styles.subtitle}>
-            We sent a 6-digit code to{'\n'}
-            <Text style={styles.emailHighlight}>your@email.com</Text>
+            We sent a 6-digit code to your email address. Enter it below to verify.
           </Text>
         </Animated.View>
 
-        {/* OTP boxes */}
-        <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.otpRow}>
-          {Array(CODE_LENGTH).fill(0).map((_, i) => (
-            <Animated.View
-              key={i}
-              style={[
-                styles.otpBox,
-                otp[i] ? styles.otpBoxFilled : null,
-                focusedIndex === i && !otp[i] ? styles.otpBoxFocused : null,
-                boxStyles[i],
-              ]}
-            >
-              <TextInput
-                ref={(ref) => { inputRefs.current[i] = ref; }}
-                style={styles.otpInput}
-                value={otp[i]}
-                onChangeText={(text) => handleChange(text, i)}
-                onKeyPress={(e) => handleKeyPress(e, i)}
-                onFocus={() => setFocusedIndex(i)}
-                keyboardType="number-pad"
-                maxLength={2}
-                caretHidden
-                selectTextOnFocus
-              />
-            </Animated.View>
-          ))}
+        {/* OTP Input */}
+        <Animated.View entering={FadeInDown.delay(300).duration(500)}>
+          <Text style={styles.fieldLabel}>Verification code</Text>
+          <TextInput
+            style={styles.otpInput}
+            placeholder="000000"
+            placeholderTextColor="#CCC"
+            value={otp}
+            onChangeText={(text) => setOtp(text.replace(/[^0-9]/g, '').slice(0, 6))}
+            keyboardType="number-pad"
+            maxLength={6}
+            editable={!isLoading}
+          />
+        </Animated.View>
+
+        {/* Verify Button */}
+        <Animated.View entering={FadeInDown.delay(380).duration(500)}>
+          <TouchableOpacity
+            style={[styles.verifyBtn, (otp.length !== 6 || isLoading) && styles.btnDisabled]}
+            onPress={handleVerify}
+            disabled={otp.length !== 6 || isLoading}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.verifyBtnText}>
+              {isLoading ? 'Verifying...' : 'Verify'}
+            </Text>
+          </TouchableOpacity>
         </Animated.View>
 
         {/* Resend */}
-        <Animated.View entering={FadeInDown.delay(420).duration(500)} style={styles.resendRow}>
-          {canResend ? (
-            <TouchableOpacity onPress={handleResend} activeOpacity={0.7}>
-              <Text style={styles.resendActive}>Resend code</Text>
-            </TouchableOpacity>
-          ) : (
-            <Text style={styles.resendCountdown}>
-              Resend code in <Text style={styles.resendTimer}>{countdown}s</Text>
-            </Text>
-          )}
-        </Animated.View>
-
-        {/* Verify */}
-        <Animated.View entering={FadeInDown.delay(520).duration(500)}>
+        <Animated.View entering={FadeInDown.delay(450).duration(500)} style={styles.resendRow}>
+          <Text style={styles.resendText}>Didn't receive the code? </Text>
           <TouchableOpacity
-            style={[styles.verifyBtn, !isComplete && styles.verifyBtnDisabled]}
-            disabled={!isComplete}
-            activeOpacity={0.85}
+            onPress={handleResend}
+            disabled={resendCooldown > 0 || isLoading}
           >
-            <Text style={styles.verifyBtnText}>Verify email</Text>
+            <Text style={[
+              styles.resendLink,
+              (resendCooldown > 0 || isLoading) && styles.resendDisabled
+            ]}>
+              {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend'}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
-
-        {/* Wrong email */}
-        <Animated.View entering={FadeInDown.delay(600).duration(500)} style={styles.wrongRow}>
-          <Text style={styles.wrongText}>Wrong email? </Text>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.wrongLink}>Change it</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D0D0D' },
-  header: { paddingHorizontal: 24, paddingTop: 56 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 56, paddingBottom: 32 },
+
   backBtn: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: '#1A1A1A', alignItems: 'center', justifyContent: 'center',
+    marginBottom: 24,
   },
-  content: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
 
   logoArea: { alignItems: 'center', marginBottom: 36 },
   logoRow: { flexDirection: 'row', alignItems: 'flex-end' },
@@ -198,56 +154,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#14A800', marginBottom: 5, marginLeft: 2,
   },
 
-  titleArea: { alignItems: 'center', marginBottom: 40 },
+  iconArea: { alignItems: 'center', marginBottom: 28 },
   iconWrapper: {
-    width: 68, height: 68, borderRadius: 34,
+    width: 72, height: 72, borderRadius: 36,
     backgroundColor: '#14A80014', borderWidth: 1, borderColor: '#14A80035',
-    alignItems: 'center', justifyContent: 'center', marginBottom: 18,
-  },
-  title: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 10 },
-  subtitle: { fontSize: 14, color: '#9BA1A6', textAlign: 'center', lineHeight: 22 },
-  emailHighlight: { color: '#fff', fontWeight: '600' },
-
-  otpRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 10,
-    marginBottom: 28,
-  },
-  otpBox: {
-    width: 48, height: 58, borderRadius: 14,
-    backgroundColor: '#1A1A1A', borderWidth: 1.5, borderColor: '#2A2A2A',
     alignItems: 'center', justifyContent: 'center',
   },
-  otpBoxFilled: {
-    borderColor: '#14A800',
-    backgroundColor: '#14A80012',
-  },
-  otpBoxFocused: {
-    borderColor: '#14A800',
-  },
-  otpInput: {
-    width: '100%', height: '100%',
-    textAlign: 'center',
-    fontSize: 22, fontWeight: '700', color: '#fff',
+
+  title: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 10, textAlign: 'center' },
+  subtitle: {
+    fontSize: 14, color: '#9BA1A6', textAlign: 'center', lineHeight: 22,
   },
 
-  resendRow: { alignItems: 'center', marginBottom: 32 },
-  resendCountdown: { fontSize: 14, color: '#555' },
-  resendTimer: { color: '#14A800', fontWeight: '700' },
-  resendActive: { fontSize: 14, color: '#14A800', fontWeight: '700' },
+  fieldLabel: { color: '#ccc', fontSize: 13, fontWeight: '500', marginBottom: 12, marginTop: 32 },
+  otpInput: {
+    backgroundColor: '#1A1A1A', borderRadius: 10,
+    borderWidth: 1.5, borderColor: '#2A2A2A',
+    height: 60, fontSize: 28, fontWeight: '600', color: '#fff',
+    textAlign: 'center', letterSpacing: 8,
+  },
 
   verifyBtn: {
     backgroundColor: '#14A800', borderRadius: 10,
-    height: 54, alignItems: 'center', justifyContent: 'center',
+    height: 54, alignItems: 'center', justifyContent: 'center', marginTop: 28,
   },
-  verifyBtnDisabled: { opacity: 0.4 },
+  btnDisabled: { opacity: 0.5 },
   verifyBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
-  wrongRow: {
-    flexDirection: 'row', justifyContent: 'center',
-    alignItems: 'center', marginTop: 22,
-  },
-  wrongText: { color: '#555', fontSize: 13 },
-  wrongLink: { color: '#14A800', fontSize: 13, fontWeight: '600' },
+  resendRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 28 },
+  resendText: { color: '#9BA1A6', fontSize: 14 },
+  resendLink: { color: '#14A800', fontSize: 14, fontWeight: '700' },
+  resendDisabled: { opacity: 0.5, color: '#666' },
 });

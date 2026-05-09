@@ -2,16 +2,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-    KeyboardAvoidingView, Platform, ScrollView,
-    StyleSheet,
-    Text, TextInput, TouchableOpacity,
-    View,
+  KeyboardAvoidingView, Platform, ScrollView,
+  StyleSheet,
+  Text, TextInput, TouchableOpacity,
+  View, Alert,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function SignInScreen() {
+  const { login, isLoading, error, clearError } = useAuth();
   const [email, setEmail] = useState('');
-  const [focused, setFocused] = useState(false);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [focused, setFocused] = useState<string | null>(null);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    try {
+      await login(email, password);
+      router.replace('/(tabs)');
+    } catch (err: any) {
+      Alert.alert('Login Failed', error || 'Please check your credentials');
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -38,10 +55,10 @@ export default function SignInScreen() {
           </View>
         </Animated.View>
 
-        {/* Field */}
+        {/* Email Field */}
         <Animated.View entering={FadeInDown.delay(180).duration(500)}>
           <Text style={styles.fieldLabel}>Username or email</Text>
-          <View style={[styles.inputWrapper, focused && styles.inputWrapperFocused]}>
+          <View style={[styles.inputWrapper, focused === 'email' && styles.inputWrapperFocused]}>
             <Ionicons name="person-outline" size={18} color="#666" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
@@ -49,18 +66,53 @@ export default function SignInScreen() {
               placeholderTextColor="#555"
               value={email}
               onChangeText={setEmail}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
+              onFocus={() => setFocused('email')}
+              onBlur={() => setFocused(null)}
               autoCapitalize="none"
               keyboardType="email-address"
+              editable={!isLoading}
             />
+          </View>
+        </Animated.View>
+
+        {/* Password Field */}
+        <Animated.View entering={FadeInDown.delay(230).duration(500)}>
+          <Text style={styles.fieldLabel}>Password</Text>
+          <View style={[styles.inputWrapper, focused === 'password' && styles.inputWrapperFocused]}>
+            <Ionicons name="lock-closed-outline" size={18} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#555"
+              value={password}
+              onChangeText={setPassword}
+              onFocus={() => setFocused('password')}
+              onBlur={() => setFocused(null)}
+              secureTextEntry={!showPassword}
+              editable={!isLoading}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              <Ionicons
+                name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                size={18}
+                color="#666"
+                style={{ marginRight: 12 }}
+              />
+            </TouchableOpacity>
           </View>
         </Animated.View>
 
         {/* Continue */}
         <Animated.View entering={FadeInDown.delay(280).duration(500)}>
-          <TouchableOpacity style={styles.btnContinue} activeOpacity={0.85}>
-            <Text style={styles.btnContinueText}>Continue</Text>
+          <TouchableOpacity
+            style={[styles.btnContinue, isLoading && styles.btnDisabled]}
+            onPress={handleLogin}
+            activeOpacity={0.85}
+            disabled={isLoading}
+          >
+            <Text style={styles.btnContinueText}>
+              {isLoading ? 'Logging in...' : 'Continue'}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
 
@@ -85,7 +137,7 @@ export default function SignInScreen() {
 
         {/* Google */}
         <Animated.View entering={FadeInDown.delay(440).duration(500)}>
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.85} disabled={isLoading}>
             <Text style={styles.googleG}>G</Text>
             <Text style={styles.socialBtnText}>Continue with Google</Text>
           </TouchableOpacity>
@@ -93,7 +145,7 @@ export default function SignInScreen() {
 
         {/* Apple */}
         <Animated.View entering={FadeInDown.delay(510).duration(500)}>
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.85} disabled={isLoading}>
             <Ionicons name="logo-apple" size={20} color="#000" />
             <Text style={styles.socialBtnText}>Continue with Apple</Text>
           </TouchableOpacity>
@@ -102,7 +154,7 @@ export default function SignInScreen() {
         {/* Footer */}
         <Animated.View entering={FadeInDown.delay(580).duration(500)} style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => router.replace('/(auth)/sign-up')}>
+          <TouchableOpacity onPress={() => router.replace('/(auth)/sign-up')} disabled={isLoading}>
             <Text style={styles.footerLink}>Sign Up</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -144,6 +196,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#14A800', borderRadius: 10,
     height: 54, alignItems: 'center', justifyContent: 'center', marginBottom: 4,
   },
+  btnDisabled: { opacity: 0.6 },
   btnContinueText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
   forgotRow: { alignItems: 'flex-end', marginBottom: 24 },
@@ -164,6 +217,7 @@ const styles = StyleSheet.create({
   },
   googleG: { fontSize: 18, fontWeight: '800', color: '#4285F4' },
   socialBtnText: { fontSize: 15, fontWeight: '600', color: '#000' },
+
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 36 },
   footerText: { color: '#9BA1A6', fontSize: 14 },
   footerLink: { color: '#14A800', fontSize: 14, fontWeight: '700' },

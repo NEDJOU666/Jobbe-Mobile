@@ -1,13 +1,15 @@
 import {
   StyleSheet, View, Text, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ScrollView,
+  KeyboardAvoidingView, Platform, ScrollView, Alert,
 } from 'react-native';
 import { useState } from 'react';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function SignUpScreen() {
+  const { signup, sendVerificationOtp, isLoading, error } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -16,6 +18,29 @@ export default function SignUpScreen() {
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [receiveEmails, setReceiveEmails] = useState(true);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  const handleSignup = async () => {
+    if (!firstName || !lastName || !email || !password) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    if (password.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters');
+      return;
+    }
+    if (!agreedTerms) {
+      Alert.alert('Error', 'You must accept the terms and conditions');
+      return;
+    }
+
+    try {
+      await signup(`${firstName} ${lastName}`, email, password, receiveEmails);
+      // OTP is auto-sent by the backend on signup — go straight to verify screen
+      router.replace('/(auth)/verify-otp');
+    } catch (err: any) {
+      Alert.alert('Signup Failed', error || 'Please try again');
+    }
+  };
 
   const inputStyle = (field: string) => [
     styles.input,
@@ -50,7 +75,7 @@ export default function SignUpScreen() {
 
         {/* Google */}
         <Animated.View entering={FadeInDown.delay(150).duration(500)}>
-          <TouchableOpacity style={styles.googleBtn} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.googleBtn} activeOpacity={0.85} disabled={isLoading}>
             <Text style={styles.googleG}>G</Text>
             <Text style={styles.googleBtnText}>Continue with Google</Text>
           </TouchableOpacity>
@@ -74,6 +99,7 @@ export default function SignUpScreen() {
               placeholderTextColor="#999"
               onFocus={() => setFocusedField('firstName')}
               onBlur={() => setFocusedField(null)}
+              editable={!isLoading}
             />
           </View>
           <View style={styles.nameField}>
@@ -85,6 +111,7 @@ export default function SignUpScreen() {
               placeholderTextColor="#999"
               onFocus={() => setFocusedField('lastName')}
               onBlur={() => setFocusedField(null)}
+              editable={!isLoading}
             />
           </View>
         </Animated.View>
@@ -101,6 +128,7 @@ export default function SignUpScreen() {
             placeholderTextColor="#999"
             onFocus={() => setFocusedField('email')}
             onBlur={() => setFocusedField(null)}
+            editable={!isLoading}
           />
         </Animated.View>
 
@@ -117,8 +145,9 @@ export default function SignUpScreen() {
               secureTextEntry={!showPassword}
               onFocus={() => setFocusedField('password')}
               onBlur={() => setFocusedField(null)}
+              editable={!isLoading}
             />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
               <Ionicons
                 name={showPassword ? 'eye-outline' : 'eye-off-outline'}
                 size={20}
@@ -143,6 +172,7 @@ export default function SignUpScreen() {
             style={styles.checkboxRow}
             onPress={() => setReceiveEmails(!receiveEmails)}
             activeOpacity={0.8}
+            disabled={isLoading}
           >
             <View style={[styles.checkbox, receiveEmails && styles.checkboxChecked]}>
               {receiveEmails && <Ionicons name="checkmark" size={13} color="#fff" />}
@@ -156,6 +186,7 @@ export default function SignUpScreen() {
             style={styles.checkboxRow}
             onPress={() => setAgreedTerms(!agreedTerms)}
             activeOpacity={0.8}
+            disabled={isLoading}
           >
             <View style={[styles.checkbox, agreedTerms && styles.checkboxChecked]}>
               {agreedTerms && <Ionicons name="checkmark" size={13} color="#fff" />}
@@ -172,18 +203,21 @@ export default function SignUpScreen() {
         {/* Submit */}
         <Animated.View entering={FadeInDown.delay(530).duration(500)}>
           <TouchableOpacity
-            style={[styles.createBtn, !agreedTerms && styles.createBtnDisabled]}
-            disabled={!agreedTerms}
+            style={[styles.createBtn, (!agreedTerms || isLoading) && styles.createBtnDisabled]}
+            disabled={!agreedTerms || isLoading}
             activeOpacity={0.85}
+            onPress={handleSignup}
           >
-            <Text style={styles.createBtnText}>Create my account</Text>
+            <Text style={styles.createBtnText}>
+              {isLoading ? 'Creating account...' : 'Create my account'}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
 
         {/* Login link */}
         <Animated.View entering={FadeInDown.delay(580).duration(500)} style={styles.footer}>
           <Text style={styles.footerText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => router.replace('/(auth)/sign-in')}>
+          <TouchableOpacity onPress={() => router.replace('/(auth)/sign-in')} disabled={isLoading}>
             <Text style={styles.footerLink}>Log In</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -236,9 +270,9 @@ const styles = StyleSheet.create({
   passwordWrapper: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: 1.5, borderColor: '#E0E0E0', borderRadius: 10, height: 50,
+    marginTop: 16,
   },
   passwordInput: { flex: 1, paddingHorizontal: 14, fontSize: 15, color: '#000' },
-  eyeBtn: { paddingHorizontal: 14 },
 
   countryPicker: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

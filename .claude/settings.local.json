@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); Set-Location \"d:\\\\New folder\\\\Jobbe-api\"; $job = Start-Job { Set-Location \"d:\\\\New folder\\\\Jobbe-api\"; & \"C:\\\\Users\\\\king Fayssal\\\\AppData\\\\Roaming\\\\npm\\\\bun.exe\" run src/index.ts 2>&1 }; Start-Sleep -Seconds 5; $output = Receive-Job $job; Stop-Job $job; Remove-Job $job; $output)",
+      "Read(//c/Users/king Fayssal/AppData/Roaming/npm/**)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); Set-Location \"d:\\\\New folder\\\\Jobbe-api\"; $proc = Start-Process -FilePath \"bun\" -ArgumentList \"run src/index.ts\" -WorkingDirectory \"d:\\\\New folder\\\\Jobbe-api\" -PassThru -NoNewWindow -RedirectStandardOutput \"out.txt\" -RedirectStandardError \"err.txt\"; Start-Sleep -Seconds 4; $proc.Kill\\(\\); Get-Content \"out.txt\",\"err.txt\" -ErrorAction SilentlyContinue; Remove-Item \"out.txt\",\"err.txt\" -ErrorAction SilentlyContinue)"
+    ]
+  }
+}
