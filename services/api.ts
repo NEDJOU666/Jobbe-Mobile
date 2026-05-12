@@ -1,7 +1,7 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
 import { secureStorage } from '@/utils/secureStorage';
+import axios, { AxiosError, AxiosInstance } from 'axios';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface ApiResponse<T = any> {
   accessToken?: string;
@@ -83,8 +83,9 @@ api.interceptors.response.use(
         withCredentials: true,
       });
 
-      const { accessToken } = response.data;
+      const { accessToken, refreshToken: newRefreshToken } = response.data;
       await secureStorage.setAccessToken(accessToken);
+      if (newRefreshToken) await secureStorage.setRefreshToken(newRefreshToken);
 
       originalRequest.headers.Authorization = `Bearer ${accessToken}`;
       processQueue(accessToken);
