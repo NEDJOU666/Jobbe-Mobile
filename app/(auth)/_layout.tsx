@@ -8,6 +8,7 @@ export default function AuthLayout() {
       <Stack.Screen name="sign-up" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="forgot-password" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="verify-otp" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="oauth-callback" options={{ animation: 'fade' }} />
     </Stack>
   );
 }

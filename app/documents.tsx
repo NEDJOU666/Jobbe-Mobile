@@ -1,20 +1,29 @@
 import {
-    useDeleteDocument,
-    useDocuments,
-    useSetDefaultDocument,
-    type UserDocument,
+  useDeleteDocument,
+  useDocuments,
+  useSetDefaultDocument,
+  useUploadDocument,
+  type UserDocument,
 } from '@/hooks/useDocuments';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator, Alert, ScrollView, StyleSheet,
+  Text, TouchableOpacity, View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type DocType = 'RESUME' | 'COVER_LETTER' | 'CERTIFICATE' | 'OTHER';
 
-const TYPE_LABEL: Record<DocType, string> = { RESUME: 'Resume', COVER_LETTER: 'Cover Letter', CERTIFICATE: 'Certificate', OTHER: 'Other' };
-const TYPE_COLOR: Record<DocType, string> = { RESUME: '#14A800', COVER_LETTER: '#1565C0', CERTIFICATE: '#F57F17', OTHER: '#555' };
+const TYPE_LABEL: Record<DocType, string> = {
+  RESUME: 'Resume', COVER_LETTER: 'Cover Letter', CERTIFICATE: 'Certificate', OTHER: 'Other',
+};
+const TYPE_COLOR: Record<DocType, string> = {
+  RESUME: '#14A800', COVER_LETTER: '#1565C0', CERTIFICATE: '#F57F17', OTHER: '#555',
+};
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -29,6 +38,7 @@ export default function DocumentsScreen() {
   const { data: docs = [], isLoading, isError, refetch } = useDocuments();
   const { mutate: setDefault } = useSetDefaultDocument();
   const { mutate: deleteDoc } = useDeleteDocument();
+  const { mutate: uploadDoc, isPending: isUploading } = useUploadDocument();
 
   const filters: Array<DocType | 'ALL'> = ['ALL', 'RESUME', 'COVER_LETTER', 'CERTIFICATE', 'OTHER'];
   const filtered = filter === 'ALL' ? docs : docs.filter((d) => d.documentType === filter);
@@ -44,8 +54,47 @@ export default function DocumentsScreen() {
     );
   };
 
-  const handleUpload = () => {
-    Alert.alert('Coming soon', 'File upload will be available in the next release.');
+  const handleUpload = async (docType: DocType = 'RESUME') => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ],
+      copyToCacheDirectory: true,
+    });
+
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+
+    uploadDoc(
+      {
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType ?? 'application/pdf',
+        documentType: docType,
+      },
+      {
+        onError: (err: any) => {
+          const msg = err?.response?.data?.message ?? 'Upload failed. Please try again.';
+          Alert.alert('Upload failed', msg);
+        },
+      },
+    );
+  };
+
+  const promptDocType = () => {
+    Alert.alert(
+      'Document type',
+      'What type of document are you uploading?',
+      [
+        { text: 'Resume',       onPress: () => handleUpload('RESUME') },
+        { text: 'Cover Letter', onPress: () => handleUpload('COVER_LETTER') },
+        { text: 'Certificate',  onPress: () => handleUpload('CERTIFICATE') },
+        { text: 'Other',        onPress: () => handleUpload('OTHER') },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
   };
 
   return (
@@ -55,15 +104,21 @@ export default function DocumentsScreen() {
           <Ionicons name="arrow-back" size={20} color={c.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Documents</Text>
-        <TouchableOpacity style={styles.iconBtn} onPress={handleUpload}>
-          <Ionicons name="cloud-upload-outline" size={20} color={c.accent} />
+        <TouchableOpacity style={styles.iconBtn} onPress={promptDocType} disabled={isUploading}>
+          {isUploading
+            ? <ActivityIndicator size="small" color={c.accent} />
+            : <Ionicons name="cloud-upload-outline" size={20} color={c.accent} />}
         </TouchableOpacity>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
         <View style={styles.filterRow}>
           {filters.map((f) => (
-            <TouchableOpacity key={f} style={[styles.filterChip, filter === f && styles.filterChipActive]} onPress={() => setFilter(f)}>
+            <TouchableOpacity
+              key={f}
+              style={[styles.filterChip, filter === f && styles.filterChipActive]}
+              onPress={() => setFilter(f)}
+            >
               <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
                 {f === 'ALL' ? 'All' : TYPE_LABEL[f as DocType]}
               </Text>
@@ -84,10 +139,19 @@ export default function DocumentsScreen() {
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <TouchableOpacity style={styles.uploadArea} onPress={handleUpload}>
-            <Ionicons name="cloud-upload-outline" size={28} color={c.accent} />
-            <Text style={styles.uploadTitle}>Upload document</Text>
-            <Text style={styles.uploadHint}>PDF, DOC · Max 10 MB</Text>
+          <TouchableOpacity style={styles.uploadArea} onPress={promptDocType} disabled={isUploading} activeOpacity={0.75}>
+            {isUploading ? (
+              <>
+                <ActivityIndicator color={c.accent} />
+                <Text style={styles.uploadTitle}>Uploading…</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="cloud-upload-outline" size={28} color={c.accent} />
+                <Text style={styles.uploadTitle}>Upload document</Text>
+                <Text style={styles.uploadHint}>PDF, DOC · Max 10 MB</Text>
+              </>
+            )}
           </TouchableOpacity>
 
           {filtered.length === 0 ? (
@@ -107,7 +171,11 @@ export default function DocumentsScreen() {
                   <View style={styles.docInfo}>
                     <View style={styles.docNameRow}>
                       <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
-                      {doc.isDefault && <View style={styles.defaultBadge}><Text style={styles.defaultText}>Default</Text></View>}
+                      {doc.isDefault && (
+                        <View style={styles.defaultBadge}>
+                          <Text style={styles.defaultText}>Default</Text>
+                        </View>
+                      )}
                     </View>
                     <Text style={styles.docMeta}>
                       {TYPE_LABEL[docType] ?? docType}

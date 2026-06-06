@@ -8,9 +8,9 @@ export interface JobFirm {
 
 export interface Job {
   id: string; title: string; description: string
-  postType: string; employmentType: string; locationType: string; location: string
+  postType: 'JOB' | 'INTERNSHIP'; employmentType: 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'INTERNSHIP'; locationType: 'REMOTE' | 'ONSITE' | 'HYBRID'; location: string
   isPaid: boolean; creditCost: number; applicationDeadline: string | null
-  applyType: string; applyUrl: string | null; status: string; viewCount: number
+  applyType: 'INTERNAL' | 'EXTERNAL'; applyUrl: string | null; status: string; viewCount: number
   properties: {
     experienceLevel?: string; salaryMin?: number; salaryMax?: number
     currency?: string; skills?: string[]; requirements?: string[]

@@ -1,6 +1,7 @@
 import {
     useMarkAllRead,
     useMarkRead,
+    useNotificationStream,
     useNotifications,
     type Notification as NotifItem,
     type NotificationType,
@@ -38,8 +39,9 @@ export default function AlertsScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useNotifications();
   const { mutate: markRead } = useMarkRead();
   const { mutate: markAllRead } = useMarkAllRead();
+  useNotificationStream();
 
-  const notifs = data?.data ?? [];
+  const notifs = data?.notifications ?? [];
   const unread = data?.unreadCount ?? 0;
 
   return (

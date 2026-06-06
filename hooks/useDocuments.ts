@@ -22,6 +22,22 @@ export function useAddDocument() {
   })
 }
 
+export function useUploadDocument() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: { uri: string; name: string; mimeType: string; documentType?: string }) => {
+      const form = new FormData()
+      form.append('file', { uri: params.uri, name: params.name, type: params.mimeType } as any)
+      form.append('documentType', params.documentType ?? 'RESUME')
+      form.append('name', params.name)
+      return api.post('/documents/upload', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then((r) => r.data)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents'] }),
+  })
+}
+
 export function useSetDefaultDocument() {
   const qc = useQueryClient()
   return useMutation({

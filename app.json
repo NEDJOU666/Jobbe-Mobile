@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Jobbe",
-    "slug": "Jobbe",
+    "name": "JobFinder",
+    "slug": "jobfinder",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "jobbe",
+    "scheme": "jobfinder",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

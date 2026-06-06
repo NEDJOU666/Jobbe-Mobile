@@ -8,7 +8,10 @@ import {
   View, Alert,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@/hooks/useAuth';
+
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3004/api';
 
 export default function SignInScreen() {
   const { login, isLoading, error, clearError } = useAuth();
@@ -24,6 +27,16 @@ export default function SignInScreen() {
     }
     try {
       await login(email, password);
+      const { secureStorage } = await import('@/utils/secureStorage');
+      const token = await secureStorage.getAccessToken();
+      if (token) {
+        const res = await fetch(`${API_BASE}/profile`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+        const data = res?.ok ? await res.json() : null;
+        if (data?.role !== 'EMPLOYER' && !data?.profile?.profileCompleted) {
+          router.replace('/onboarding' as any);
+          return;
+        }
+      }
       router.replace('/(tabs)');
     } catch (err: any) {
       Alert.alert('Login Failed', error || 'Please check your credentials');
@@ -137,17 +150,33 @@ export default function SignInScreen() {
 
         {/* Google */}
         <Animated.View entering={FadeInDown.delay(440).duration(500)}>
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.85} disabled={isLoading}>
+          <TouchableOpacity
+            style={styles.socialBtn}
+            activeOpacity={0.85}
+            disabled={isLoading}
+            onPress={() => WebBrowser.openAuthSessionAsync(
+              `${API_BASE}/auth/google?source=mobile`,
+              'jobfinder://auth/callback',
+            )}
+          >
             <Text style={styles.googleG}>G</Text>
             <Text style={styles.socialBtnText}>Continue with Google</Text>
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Apple */}
+        {/* GitHub */}
         <Animated.View entering={FadeInDown.delay(510).duration(500)}>
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.85} disabled={isLoading}>
-            <Ionicons name="logo-apple" size={20} color="#000" />
-            <Text style={styles.socialBtnText}>Continue with Apple</Text>
+          <TouchableOpacity
+            style={styles.socialBtn}
+            activeOpacity={0.85}
+            disabled={isLoading}
+            onPress={() => WebBrowser.openAuthSessionAsync(
+              `${API_BASE}/auth/github?source=mobile`,
+              'jobfinder://auth/callback',
+            )}
+          >
+            <Ionicons name="logo-github" size={20} color="#000" />
+            <Text style={styles.socialBtnText}>Continue with GitHub</Text>
           </TouchableOpacity>
         </Animated.View>
 

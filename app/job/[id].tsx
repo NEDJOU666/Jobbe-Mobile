@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import * as Linking from 'expo-linking';
+import { useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/hooks/useTheme';
 import { useJob } from '@/hooks/useJobs';
-import { useToggleSave } from '@/hooks/useSaved';
+import { useToggleSave, useSaved } from '@/hooks/useSaved';
+import { useCheckApplied } from '@/hooks/useApplications';
 
 const EMP: Record<string, string> = { FULL_TIME: 'Full-time', PART_TIME: 'Part-time', CONTRACT: 'Contract', INTERNSHIP: 'Internship' };
 const LOC: Record<string, string> = { REMOTE: 'Remote', ONSITE: 'On-site', HYBRID: 'Hybrid' };
@@ -26,16 +28,44 @@ export default function JobDetailScreen() {
   const qc = useQueryClient();
 
   const { data: job, isLoading, isError } = useJob(id ?? '');
+  const { data: savedJobs = [] } = useSaved();
   const { mutate: toggleSave } = useToggleSave();
-  const [saved, setSaved] = useState(false);
+  const { data: appliedData } = useCheckApplied(id ?? '');
+
+  const saved = savedJobs.some((j) => j.id === id);
+  const applied = appliedData?.applied ?? false;
 
   const handleSave = () => {
-    const next = !saved;
-    setSaved(next);
     toggleSave(id ?? '', {
-      onError: () => setSaved(!next),
       onSuccess: () => qc.invalidateQueries({ queryKey: ['saved'] }),
     });
+  };
+
+  const handleApply = () => {
+    if (!job) return;
+    const props     = (job as any).properties ?? {};
+    const isScraped = !!(job as any).source;
+
+    // Scraped + email found → normal in-app apply (backend emails company silently)
+    if (isScraped && props.applyEmail) {
+      router.push(`/apply/${job.id}`);
+      return;
+    }
+
+    // Scraped + no email → in-app apply (application saved to DB)
+    if (isScraped && !(job as any).properties?.applyEmail) {
+      router.push(`/apply/${job.id}`);
+      return;
+    }
+
+    // Regular external post → open in system browser
+    if (job.applyType === 'EXTERNAL' && (job as any).applyUrl) {
+      Linking.openURL((job as any).applyUrl);
+      return;
+    }
+
+    // Regular internal post
+    router.push(`/apply/${job.id}`);
   };
 
   if (isLoading) {
@@ -59,7 +89,9 @@ export default function JobDetailScreen() {
   }
 
   const { title, description, employmentType, locationType, properties, firm, _count, viewCount, applicationDeadline, applyType } = job;
-  const { salaryMin, salaryMax, currency = 'XAF', skills = [], requirements = [], experienceLevel } = properties as any;
+  const isScraped = !!(job as any).source;
+  const { salaryMin, salaryMax, currency = 'XAF', skills = [], requirements = [], benefits = [], experienceLevel, scrapedCompany } = properties as any;
+  const displayCompany = isScraped && scrapedCompany ? scrapedCompany : firm.name;
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
@@ -81,13 +113,20 @@ export default function JobDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {/* Company card */}
         <View style={styles.companyCard}>
-          <View style={styles.companyAvatar}><Text style={styles.companyInitial}>{firm.name.charAt(0)}</Text></View>
+          {isScraped ? (
+            <View style={[styles.companyAvatar, { backgroundColor: '#FFF8E1', borderColor: '#FFE082' }]}>
+              <Ionicons name="hardware-chip-outline" size={24} color="#F59E0B" />
+            </View>
+          ) : (
+            <View style={styles.companyAvatar}><Text style={styles.companyInitial}>{firm.name.charAt(0)}</Text></View>
+          )}
           <View style={styles.companyInfo}>
             <View style={styles.companyNameRow}>
-              <Text style={styles.companyName}>{firm.name}</Text>
-              {(firm as any).status === 'VERIFIED' && <Ionicons name="checkmark-circle" size={15} color={c.accent} />}
+              <Text style={styles.companyName}>{displayCompany}</Text>
+              {!isScraped && (firm as any).status === 'VERIFIED' && <Ionicons name="checkmark-circle" size={15} color={c.accent} />}
+              {isScraped && <Ionicons name="globe-outline" size={13} color="#F59E0B" />}
             </View>
-            <Text style={styles.companyMeta}>{firm.city} · {(firm as any).domain_role}</Text>
+            <Text style={styles.companyMeta}>{isScraped ? (job as any).source : `${firm.city} · ${(firm as any).domain_role}`}</Text>
           </View>
         </View>
 
@@ -166,9 +205,24 @@ export default function JobDetailScreen() {
           </View>
         )}
 
+        {/* Benefits */}
+        {benefits.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Benefits & Perks</Text>
+            <View style={styles.skillsGrid}>
+              {benefits.map((b: string) => (
+                <View key={b} style={styles.benefitChip}>
+                  <Ionicons name="checkmark-circle-outline" size={14} color="#16a34a" />
+                  <Text style={styles.benefitText}>{b}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* About firm */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About {firm.name}</Text>
+          <Text style={styles.sectionTitle}>About {displayCompany}</Text>
           <View style={styles.firmGrid}>
             {[
               { icon: 'location-outline',  label: 'Location', value: firm.city },
@@ -195,14 +249,22 @@ export default function JobDetailScreen() {
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
           <Ionicons name={saved ? 'heart' : 'heart-outline'} size={20} color={c.accent} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.applyBtn}
-          activeOpacity={0.85}
-          onPress={() => applyType === 'INTERNAL' ? router.push(`/apply/${job.id}`) : null}
-        >
-          <Text style={styles.applyBtnText}>{applyType === 'EXTERNAL' ? 'Apply on Website' : 'Apply Now'}</Text>
-          {applyType === 'EXTERNAL' && <Ionicons name="open-outline" size={16} color="#fff" style={{ marginLeft: 6 }} />}
-        </TouchableOpacity>
+
+        {applied ? (
+          <View style={[styles.applyBtn, styles.appliedBtn]}>
+            <Ionicons name="checkmark-circle" size={18} color={c.accent} />
+            <Text style={[styles.applyBtnText, { color: c.accent }]}>Applied</Text>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.applyBtn} activeOpacity={0.85} onPress={handleApply}>
+            <Text style={styles.applyBtnText}>
+              {applyType === 'EXTERNAL' ? 'Apply on Website' : 'Apply Now'}
+            </Text>
+            {applyType === 'EXTERNAL' && (
+              <Ionicons name="open-outline" size={16} color="#fff" style={{ marginLeft: 6 }} />
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -242,6 +304,8 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     skillsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     skillChip: { borderWidth: 1, borderColor: c.border2, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
     skillText: { color: c.textSub, fontSize: 13 },
+    benefitChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#bbf7d0', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#f0fdf4' },
+    benefitText: { color: '#15803d', fontSize: 13 },
     firmGrid: { gap: 14 },
     firmGridItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     firmGridLabel: { color: c.textMuted, fontSize: 11 },
@@ -249,6 +313,7 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     cta: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.bg },
     saveBtn: { width: 50, height: 50, borderRadius: 14, borderWidth: 1.5, borderColor: c.accent, alignItems: 'center', justifyContent: 'center' },
     applyBtn: { flex: 1, height: 50, borderRadius: 14, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+    appliedBtn: { backgroundColor: c.accentBg, borderWidth: 1.5, borderColor: c.accent },
     applyBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   });
 }

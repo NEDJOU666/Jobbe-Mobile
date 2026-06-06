@@ -4,6 +4,7 @@ import { useJob } from '@/hooks/useJobs';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -125,7 +126,20 @@ export default function ApplyScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {step === 0 && <StepResume c={c} styles={styles} docs={resumes} selectedDoc={selectedDocId} onSelect={setSelectedDocId} />}
         {step === 1 && <StepCoverLetter c={c} styles={styles} value={coverLetter} onChange={setCoverLetter} />}
-        {step === 2 && <StepReview c={c} styles={styles} doc={selectedDoc} coverLetter={coverLetter} jobTitle={job?.title ?? '—'} firm={job?.firm?.name ?? '—'} />}
+        {step === 2 && (
+          <StepReview
+            c={c}
+            styles={styles}
+            doc={selectedDoc}
+            coverLetter={coverLetter}
+            jobTitle={job?.title ?? '—'}
+            firm={(job as any)?.source
+              ? ((job as any)?.properties?.scrapedCompany ?? job?.firm?.name ?? '—')
+              : (job?.firm?.name ?? '—')}
+            isScrapedNoEmail={!!(job as any)?.source && !(job as any)?.properties?.applyEmail}
+            sourceUrl={(job as any)?.sourceUrl}
+          />
+        )}
         <View style={{ height: 110 }} />
       </ScrollView>
 
@@ -199,7 +213,11 @@ function StepCoverLetter({ c, styles, value, onChange }: { c: any; styles: any; 
   );
 }
 
-function StepReview({ c, styles, doc, coverLetter, jobTitle, firm }: { c: any; styles: any; doc?: { name: string; size?: string | null }; coverLetter: string; jobTitle: string; firm: string }) {
+function StepReview({ c, styles, doc, coverLetter, jobTitle, firm, isScrapedNoEmail, sourceUrl }: {
+  c: any; styles: any; doc?: { name: string; size?: string | null };
+  coverLetter: string; jobTitle: string; firm: string;
+  isScrapedNoEmail?: boolean; sourceUrl?: string;
+}) {
   return (
     <View style={{ gap: 16 }}>
       <Text style={styles.sectionTitle}>Review your application</Text>
@@ -220,6 +238,19 @@ function StepReview({ c, styles, doc, coverLetter, jobTitle, firm }: { c: any; s
           ? <Text style={styles.reviewCoverText} numberOfLines={5}>{coverLetter}</Text>
           : <Text style={styles.reviewCoverEmpty}>No cover letter added</Text>}
       </View>
+      {isScrapedNoEmail && sourceUrl && (
+        <View style={styles.noticeCard}>
+          <Ionicons name="information-circle-outline" size={18} color="#1e88e5" />
+          <View style={{ flex: 1, gap: 6 }}>
+            <Text style={styles.noticeText}>
+              We'll save your application. For best results, also apply directly on the original posting.
+            </Text>
+            <TouchableOpacity onPress={() => Linking.openURL(sourceUrl)} activeOpacity={0.8}>
+              <Text style={styles.noticeLink}>View original posting →</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
       <View style={styles.consentRow}>
         <Ionicons name="shield-checkmark-outline" size={16} color={c.textMuted} />
         <Text style={styles.consentText}>By submitting, you agree to share your profile and resume with the employer.</Text>
@@ -274,6 +305,9 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     reviewDocSize: { color: c.textMuted, fontSize: 12 },
     reviewCoverText: { color: c.textBody, fontSize: 13, lineHeight: 20 },
     reviewCoverEmpty: { color: c.textDim, fontSize: 13, fontStyle: 'italic' },
+    noticeCard: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: '#e3f2fd', borderWidth: 1, borderColor: '#90caf9', borderRadius: 12, padding: 12 },
+    noticeText: { color: '#1565c0', fontSize: 13, lineHeight: 19 },
+    noticeLink: { color: '#1e88e5', fontSize: 13, fontWeight: '700' },
     consentRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
     consentText: { color: c.textMuted, fontSize: 12, lineHeight: 18, flex: 1 },
     cta: { paddingHorizontal: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.bg },

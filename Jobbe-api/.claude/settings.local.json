@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\king Fayssal\\\\Desktop\\\\jobfinder_ms\" -Recurse -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq 'app' } | Select-Object FullName)"
-    ]
-  }
-}

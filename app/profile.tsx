@@ -111,7 +111,7 @@ export default function ProfileScreen() {
 
           <Section c={c} title="Contact">
             <InfoRow c={c} icon="mail-outline" value={displayEmail} />
-            {profile?.phone ? <InfoRow c={c} icon="call-outline" value={profile.phone} /> : null}
+            {data?.phone ? <InfoRow c={c} icon="call-outline" value={data.phone} /> : null}
             {profile?.location ? <InfoRow c={c} icon="location-outline" value={profile.location} /> : null}
           </Section>
 

@@ -2,14 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 
 export interface UserProfileData {
-  id: string; name: string; email: string; avatar: string | null
+  id: string; name: string; email: string; phone: string | null; avatar: string | null
   role: string; isEmailVerified: boolean; createdAt: string
   profile: {
     headline: string | null; bio: string | null; location: string | null
-    phone: string | null; website: string | null; linkedin: string | null
+    website: string | null; linkedin: string | null
     github: string | null; skills: string[]; languages: string[]
     experience: any; education: any
     openToWork: boolean; profileVisible: boolean; showSalary: boolean
+    profileCompleted: boolean
   } | null
 }
 

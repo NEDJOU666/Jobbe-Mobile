@@ -5,6 +5,23 @@ export type ApplicationStatus =
   | 'PENDING_REVIEW' | 'FORWARDED_TO_FIRM' | 'REVIEWING'
   | 'SHORTLISTED' | 'INTERVIEW' | 'OFFER' | 'REJECTED'
 
+export type InterviewStatus = 'SCHEDULED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'RESCHEDULED'
+export type MeetingPlatform = 'ZOOM' | 'GOOGLE_MEET' | 'TEAMS' | 'PHONE' | 'IN_PERSON' | 'OTHER'
+
+export interface Interview {
+  id: string
+  application_id: string
+  firm_id: string
+  scheduled_at: string
+  duration_min: number
+  platform: MeetingPlatform
+  meeting_link: string | null
+  location: string | null
+  agenda: string | null
+  status: InterviewStatus
+  createdAt: string
+}
+
 export interface Application {
   id: string
   post_id: string; user_id: string; firm_id: string
@@ -18,6 +35,7 @@ export interface Application {
     applyType: string; properties: any
   }
   firm: { id: string; name: string; logo: string | null; city: string; country: string }
+  interview: Interview | null
 }
 
 export function useApplications() {
@@ -50,5 +68,13 @@ export function useWithdraw() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['applications'] })
     },
+  })
+}
+
+export function useCheckApplied(postId: string) {
+  return useQuery<{ applied: boolean }>({
+    queryKey: ['applied', postId],
+    queryFn: () => api.get(`/applications/post/${postId}/check`).then((r) => r.data),
+    enabled: !!postId,
   })
 }

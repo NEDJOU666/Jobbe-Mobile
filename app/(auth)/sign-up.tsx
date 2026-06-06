@@ -6,7 +6,10 @@ import { useState } from 'react';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@/hooks/useAuth';
+
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3004/api';
 
 export default function SignUpScreen() {
   const { signup, sendVerificationOtp, isLoading, error } = useAuth();
@@ -75,7 +78,15 @@ export default function SignUpScreen() {
 
         {/* Google */}
         <Animated.View entering={FadeInDown.delay(150).duration(500)}>
-          <TouchableOpacity style={styles.googleBtn} activeOpacity={0.85} disabled={isLoading}>
+          <TouchableOpacity
+            style={styles.googleBtn}
+            activeOpacity={0.85}
+            disabled={isLoading}
+            onPress={() => WebBrowser.openAuthSessionAsync(
+              `${API_BASE}/auth/google?source=mobile`,
+              'jobfinder://auth/callback',
+            )}
+          >
             <Text style={styles.googleG}>G</Text>
             <Text style={styles.googleBtnText}>Continue with Google</Text>
           </TouchableOpacity>

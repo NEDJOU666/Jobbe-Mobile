@@ -1,9 +1,9 @@
-import { useApplications, type Application, type ApplicationStatus } from '@/hooks/useApplications';
+import { useApplications, useWithdraw, type Application, type ApplicationStatus, type Interview, type MeetingPlatform } from '@/hooks/useApplications';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Status = ApplicationStatus;
@@ -22,6 +22,91 @@ const STATUS_META: Record<Status, { label: string; color: string; icon: string }
   REJECTED:          { label: 'Rejected',            color: '#C62828', icon: 'close-circle-outline' },
 };
 
+const PLATFORM_ICON: Record<MeetingPlatform, string> = {
+  ZOOM:        'videocam-outline',
+  GOOGLE_MEET: 'videocam-outline',
+  TEAMS:       'videocam-outline',
+  PHONE:       'call-outline',
+  IN_PERSON:   'location-outline',
+  OTHER:       'link-outline',
+};
+
+const PLATFORM_LABEL: Record<MeetingPlatform, string> = {
+  ZOOM:        'Zoom',
+  GOOGLE_MEET: 'Google Meet',
+  TEAMS:       'Microsoft Teams',
+  PHONE:       'Phone Call',
+  IN_PERSON:   'In Person',
+  OTHER:       'Other',
+};
+
+const INTERVIEW_STATUS_COLOR: Record<string, string> = {
+  SCHEDULED:   '#1565C0',
+  CONFIRMED:   '#14A800',
+  COMPLETED:   '#666',
+  CANCELLED:   '#C62828',
+  RESCHEDULED: '#E65100',
+};
+
+function formatInterviewDate(iso: string) {
+  const d = new Date(iso);
+  return {
+    date: d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+    time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+function InterviewCard({ interview, c, styles }: { interview: Interview; c: any; styles: any }) {
+  const { date, time } = formatInterviewDate(interview.scheduled_at);
+  const statusColor = INTERVIEW_STATUS_COLOR[interview.status] ?? '#666';
+  const isVirtual = ['ZOOM', 'GOOGLE_MEET', 'TEAMS', 'OTHER'].includes(interview.platform);
+
+  return (
+    <View style={styles.interviewCard}>
+      <View style={styles.interviewHeader}>
+        <View style={styles.interviewTitleRow}>
+          <Ionicons name="calendar-outline" size={14} color="#14A800" />
+          <Text style={styles.interviewTitle}>Interview Scheduled</Text>
+        </View>
+        <View style={[styles.interviewStatusBadge, { backgroundColor: statusColor + '18', borderColor: statusColor + '44' }]}>
+          <Text style={[styles.interviewStatusText, { color: statusColor }]}>{interview.status}</Text>
+        </View>
+      </View>
+
+      <View style={styles.interviewRow}>
+        <Ionicons name="time-outline" size={14} color={c.textMuted} />
+        <Text style={styles.interviewDetail}>{date} · {time}</Text>
+      </View>
+
+      <View style={styles.interviewRow}>
+        <Ionicons name="hourglass-outline" size={14} color={c.textMuted} />
+        <Text style={styles.interviewDetail}>{interview.duration_min} min · {PLATFORM_LABEL[interview.platform]}</Text>
+      </View>
+
+      {isVirtual && interview.meeting_link ? (
+        <TouchableOpacity style={styles.interviewRow} onPress={() => Linking.openURL(interview.meeting_link!)}>
+          <Ionicons name="link-outline" size={14} color="#1565C0" />
+          <Text style={[styles.interviewDetail, { color: '#1565C0', textDecorationLine: 'underline' }]} numberOfLines={1}>
+            Join meeting
+          </Text>
+        </TouchableOpacity>
+      ) : interview.location ? (
+        <View style={styles.interviewRow}>
+          <Ionicons name="location-outline" size={14} color={c.textMuted} />
+          <Text style={styles.interviewDetail} numberOfLines={1}>{interview.location}</Text>
+        </View>
+      ) : null}
+
+      {interview.agenda ? (
+        <View style={[styles.interviewRow, { alignItems: 'flex-start', marginTop: 2 }]}>
+          <Ionicons name="document-text-outline" size={14} color={c.textMuted} style={{ marginTop: 1 }} />
+          <Text style={[styles.interviewDetail, { flex: 1 }]} numberOfLines={3}>{interview.agenda}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 type Filter = 'ALL' | 'ACTIVE' | 'CLOSED';
 const ACTIVE_STATUSES: Status[] = ['PENDING_REVIEW', 'FORWARDED_TO_FIRM', 'REVIEWING', 'SHORTLISTED', 'INTERVIEW'];
 const CLOSED_STATUSES: Status[] = ['OFFER', 'REJECTED'];
@@ -36,6 +121,24 @@ export default function ApplicationsScreen() {
   const [filter, setFilter] = useState<Filter>('ALL');
 
   const { data: apps, isLoading, isError, refetch, isRefetching } = useApplications();
+  const { mutate: withdraw, isPending: isWithdrawing } = useWithdraw();
+
+  const WITHDRAWABLE: Status[] = ['PENDING_REVIEW', 'REVIEWING'];
+
+  const confirmWithdraw = (app: Application) => {
+    Alert.alert(
+      'Withdraw application',
+      `Remove your application for "${app.post.title}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Withdraw',
+          style: 'destructive',
+          onPress: () => withdraw(app.id),
+        },
+      ],
+    );
+  };
 
   const data = useMemo(() => {
     const list = apps ?? [];
@@ -132,9 +235,25 @@ export default function ApplicationsScreen() {
                   <Text style={[styles.journeyLabel, { color: meta.color }]}>{meta.label}</Text>
                 </View>
 
-                <View style={[styles.statusBadge, { borderColor: meta.color + '55' }]}>
-                  <Ionicons name={meta.icon as any} size={13} color={meta.color} />
-                  <Text style={[styles.statusText, { color: meta.color }]}>{meta.label}</Text>
+                {item.interview && (
+                  <InterviewCard interview={item.interview} c={c} styles={styles} />
+                )}
+
+                <View style={styles.cardBottom}>
+                  <View style={[styles.statusBadge, { borderColor: meta.color + '55' }]}>
+                    <Ionicons name={meta.icon as any} size={13} color={meta.color} />
+                    <Text style={[styles.statusText, { color: meta.color }]}>{meta.label}</Text>
+                  </View>
+                  {WITHDRAWABLE.includes(cur) && (
+                    <TouchableOpacity
+                      style={styles.withdrawBtn}
+                      onPress={() => confirmWithdraw(item)}
+                      disabled={isWithdrawing}
+                    >
+                      <Ionicons name="trash-outline" size={14} color="#C62828" />
+                      <Text style={styles.withdrawText}>Withdraw</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -169,13 +288,24 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     journeyDot: { width: 8, height: 8, borderRadius: 4 },
     journeyLine: { width: 12, height: 2, backgroundColor: c.border2, marginHorizontal: 2 },
     journeyLabel: { fontSize: 11, fontWeight: '600', marginLeft: 8 },
-    statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+    cardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
     statusText: { fontSize: 12, fontWeight: '600' },
+    withdrawBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: '#C6282833' },
+    withdrawText: { fontSize: 12, fontWeight: '600', color: '#C62828' },
     empty: { alignItems: 'center', paddingTop: 100, gap: 10 },
     emptyText: { color: c.textMuted, fontSize: 16, fontWeight: '600' },
     emptyHint: { color: c.textDim, fontSize: 13 },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
     retryBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10, backgroundColor: c.accentBg, borderWidth: 1, borderColor: c.accentBorder },
     retryText: { color: c.accent, fontWeight: '600' },
+    interviewCard: { backgroundColor: '#14A80010', borderWidth: 1, borderColor: '#14A80033', borderRadius: 10, padding: 12, marginBottom: 10, gap: 6 },
+    interviewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+    interviewTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    interviewTitle: { color: '#14A800', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+    interviewStatusBadge: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
+    interviewStatusText: { fontSize: 10, fontWeight: '700' },
+    interviewRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    interviewDetail: { color: c.textBody, fontSize: 13, flex: 1 },
   });
 }

@@ -21,7 +21,7 @@ export default function VerifyOtpScreen() {
     try {
       await verifyEmail(otp);
       Alert.alert('Success', 'Email verified!', [
-        { text: 'OK', onPress: () => router.replace('/(tabs)') }
+        { text: 'OK', onPress: () => router.replace('/onboarding' as any) }
       ]);
     } catch (err: any) {
       Alert.alert('Verification Failed', 'Invalid code. Please try again.');

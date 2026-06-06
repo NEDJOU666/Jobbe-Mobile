@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
+import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -12,12 +13,39 @@ export default function SettingsScreen() {
   const { colors: c, isDark, toggle } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
 
+  const { data: profileData } = useProfile();
+  const { mutate: updateProfile } = useUpdateProfile();
+
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [pushAlerts, setPushAlerts] = useState(true);
   const [appUpdates, setAppUpdates] = useState(false);
   const [profileVisible, setProfileVisible] = useState(true);
   const [showSalary, setShowSalary] = useState(true);
-  const [openToWork, setOpenToWork] = useState(true);
+  const [openToWork, setOpenToWork] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (!profileData?.profile || hydrated) return;
+    setProfileVisible(profileData.profile.profileVisible ?? true);
+    setShowSalary(profileData.profile.showSalary ?? true);
+    setOpenToWork(profileData.profile.openToWork ?? false);
+    setHydrated(true);
+  }, [profileData, hydrated]);
+
+  const handleProfileVisible = (v: boolean) => {
+    setProfileVisible(v);
+    updateProfile({ profileVisible: v });
+  };
+
+  const handleShowSalary = (v: boolean) => {
+    setShowSalary(v);
+    updateProfile({ showSalary: v });
+  };
+
+  const handleOpenToWork = (v: boolean) => {
+    setOpenToWork(v);
+    updateProfile({ openToWork: v });
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -64,9 +92,9 @@ export default function SettingsScreen() {
         {/* ── Privacy ── */}
         <GroupTitle c={c} label="Privacy" />
         <View style={styles.groupCard}>
-          <ToggleRow c={c} icon="eye-outline" label="Profile visible to recruiters" value={profileVisible} onToggle={setProfileVisible} />
-          <ToggleRow c={c} icon="cash-outline" label="Show salary expectations" value={showSalary} onToggle={setShowSalary} />
-          <ToggleRow c={c} icon="briefcase-outline" label="Open to work" value={openToWork} onToggle={setOpenToWork} last />
+          <ToggleRow c={c} icon="eye-outline" label="Profile visible to recruiters" value={profileVisible} onToggle={handleProfileVisible} />
+          <ToggleRow c={c} icon="cash-outline" label="Show salary expectations" value={showSalary} onToggle={handleShowSalary} />
+          <ToggleRow c={c} icon="briefcase-outline" label="Open to work" value={openToWork} onToggle={handleOpenToWork} last />
         </View>
 
         {/* ── Notifications ── */}

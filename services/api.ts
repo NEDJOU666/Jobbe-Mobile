@@ -1,7 +1,7 @@
 import { secureStorage } from '@/utils/secureStorage';
 import axios, { AxiosError, AxiosInstance } from 'axios';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3004/api';
 
 interface ApiResponse<T = any> {
   accessToken?: string;

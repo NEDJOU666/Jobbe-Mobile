@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Read(//c/Users/king Fayssal/Desktop/**)",
-      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\king Fayssal\\\\Desktop\\\\jobfinder_ms\" -ErrorAction SilentlyContinue | Where-Object { $_.PSIsContainer -eq $true } | Select-Object Name)"
-    ]
-  }
-}

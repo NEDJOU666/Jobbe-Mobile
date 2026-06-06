@@ -4,7 +4,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ProfileEditScreen() {
@@ -21,6 +21,10 @@ export default function ProfileEditScreen() {
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
   const [phone, setPhone] = useState('');
+  const [website, setWebsite] = useState('');
+  const [linkedin, setLinkedin] = useState('');
+  const [github, setGithub] = useState('');
+  const [openToWork, setOpenToWork] = useState(false);
   const [skillInput, setSkillInput] = useState('');
   const [skills, setSkills] = useState<string[]>([]);
   const [langInput, setLangInput] = useState('');
@@ -31,10 +35,14 @@ export default function ProfileEditScreen() {
   useEffect(() => {
     if (!data || hydrated) return;
     setName(data.name ?? '');
+    setPhone(data.phone ?? '');
     setHeadline(data.profile?.headline ?? '');
     setBio(data.profile?.bio ?? '');
     setLocation(data.profile?.location ?? '');
-    setPhone(data.profile?.phone ?? '');
+    setWebsite(data.profile?.website ?? '');
+    setLinkedin(data.profile?.linkedin ?? '');
+    setGithub(data.profile?.github ?? '');
+    setOpenToWork(data.profile?.openToWork ?? false);
     setSkills(data.profile?.skills ?? []);
     setLanguages(data.profile?.languages ?? []);
     setHydrated(true);
@@ -72,6 +80,11 @@ export default function ProfileEditScreen() {
         bio: bio.trim(),
         location: location.trim(),
         phone: phone.trim(),
+        // Only send URL fields when non-empty to pass backend validation
+        ...(website.trim() && { website: website.trim() }),
+        ...(linkedin.trim() && { linkedin: linkedin.trim() }),
+        ...(github.trim() && { github: github.trim() }),
+        openToWork,
         skills,
         languages,
       },
@@ -107,83 +120,150 @@ export default function ProfileEditScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Avatar */}
-        <View style={styles.avatarSection}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
-          <TouchableOpacity><Text style={styles.changePhotoText}>Change photo</Text></TouchableOpacity>
-        </View>
-
-        {/* Basic info */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Basic Info</Text>
-          <Field c={c} label="Full Name" value={name} onChangeText={setName} placeholder="Your name" />
-          <Field c={c} label="Professional Title" value={headline} onChangeText={setHeadline} placeholder="e.g. React Native Developer" />
-          <Field c={c} label="Location" value={location} onChangeText={setLocation} placeholder="City, Country" />
-          <Field c={c} label="Phone" value={phone} onChangeText={setPhone} placeholder="+237 6XX XXX XXX" keyboardType="phone-pad" />
-        </View>
-
-        {/* Bio */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>About Me</Text>
-          <TextInput style={[styles.input, styles.textarea]} value={bio} onChangeText={setBio} placeholder="Tell employers about yourself..." placeholderTextColor={c.textDim} multiline numberOfLines={5} textAlignVertical="top" />
-          <Text style={styles.charCount}>{bio.length} / 500</Text>
-        </View>
-
-        {/* Skills */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Skills</Text>
-          <View style={styles.inputRow}>
-            <TextInput style={[styles.input, { flex: 1 }]} value={skillInput} onChangeText={setSkillInput} placeholder="Add a skill..." placeholderTextColor={c.textDim} onSubmitEditing={addSkill} returnKeyType="done" />
-            <TouchableOpacity style={styles.addBtn} onPress={addSkill}>
-              <Ionicons name="add" size={18} color={c.accent} />
-            </TouchableOpacity>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+          {/* Avatar */}
+          <View style={styles.avatarSection}>
+            <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
+            <TouchableOpacity><Text style={styles.changePhotoText}>Change photo</Text></TouchableOpacity>
           </View>
-          <View style={styles.chipGrid}>
-            {skills.map((s) => (
-              <TouchableOpacity key={s} style={styles.chip} onPress={() => removeSkill(s)}>
-                <Text style={styles.chipText}>{s}</Text>
-                <Ionicons name="close" size={12} color={c.textMuted} />
+
+          {/* Basic info */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Basic Info</Text>
+            <Field c={c} label="Full Name" value={name} onChangeText={setName} placeholder="Your name" />
+            <Field c={c} label="Professional Title" value={headline} onChangeText={setHeadline} placeholder="e.g. React Native Developer" />
+            <Field c={c} label="Location" value={location} onChangeText={setLocation} placeholder="City, Country" />
+            <Field c={c} label="Phone" value={phone} onChangeText={setPhone} placeholder="+237 6XX XXX XXX" keyboardType="phone-pad" />
+          </View>
+
+          {/* Online presence */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Online Presence</Text>
+            <Field c={c} label="Website" value={website} onChangeText={setWebsite} placeholder="https://yoursite.com" keyboardType="url" />
+            <Field c={c} label="LinkedIn" value={linkedin} onChangeText={setLinkedin} placeholder="linkedin.com/in/..." keyboardType="url" />
+            <Field c={c} label="GitHub" value={github} onChangeText={setGithub} placeholder="github.com/..." keyboardType="url" />
+          </View>
+
+          {/* Bio */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>About Me</Text>
+            <TextInput
+              style={[styles.input, styles.textarea]}
+              value={bio}
+              onChangeText={setBio}
+              placeholder="Tell employers about yourself..."
+              placeholderTextColor={c.textDim}
+              multiline
+              numberOfLines={5}
+              textAlignVertical="top"
+            />
+            <Text style={styles.charCount}>{bio.length} / 500</Text>
+          </View>
+
+          {/* Skills */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Skills</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={skillInput}
+                onChangeText={setSkillInput}
+                placeholder="Add a skill..."
+                placeholderTextColor={c.textDim}
+                onSubmitEditing={addSkill}
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={styles.addBtn} onPress={addSkill}>
+                <Ionicons name="add" size={18} color={c.accent} />
               </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Languages */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Languages</Text>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-            <TextInput style={[styles.input, { flex: 1 }]} value={langInput} onChangeText={setLangInput} placeholder="Language" placeholderTextColor={c.textDim} />
-            <TextInput style={[styles.input, { flex: 1 }]} value={levelInput} onChangeText={setLevelInput} placeholder="Level (Native…)" placeholderTextColor={c.textDim} onSubmitEditing={addLanguage} returnKeyType="done" />
-            <TouchableOpacity style={[styles.addBtn, { alignSelf: 'center' }]} onPress={addLanguage}>
-              <Ionicons name="add" size={18} color={c.accent} />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.chipGrid}>
-            {languages.map((raw) => {
-              const { lang, level } = parseLang(raw);
-              return (
-                <TouchableOpacity key={raw} style={styles.chip} onPress={() => removeLang(raw)}>
-                  <Text style={styles.chipText}>{lang}{level ? ` · ${level}` : ''}</Text>
+            </View>
+            <View style={styles.chipGrid}>
+              {skills.map((s) => (
+                <TouchableOpacity key={s} style={styles.chip} onPress={() => removeSkill(s)}>
+                  <Text style={styles.chipText}>{s}</Text>
                   <Ionicons name="close" size={12} color={c.textMuted} />
                 </TouchableOpacity>
-              );
-            })}
+              ))}
+            </View>
           </View>
-        </View>
 
-        <View style={{ height: 32 }} />
-      </ScrollView>
+          {/* Languages */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Languages</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={langInput}
+                onChangeText={setLangInput}
+                placeholder="Language"
+                placeholderTextColor={c.textDim}
+              />
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={levelInput}
+                onChangeText={setLevelInput}
+                placeholder="Level (Native…)"
+                placeholderTextColor={c.textDim}
+                onSubmitEditing={addLanguage}
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={[styles.addBtn, { alignSelf: 'center' }]} onPress={addLanguage}>
+                <Ionicons name="add" size={18} color={c.accent} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.chipGrid}>
+              {languages.map((raw) => {
+                const { lang, level } = parseLang(raw);
+                return (
+                  <TouchableOpacity key={raw} style={styles.chip} onPress={() => removeLang(raw)}>
+                    <Text style={styles.chipText}>{lang}{level ? ` · ${level}` : ''}</Text>
+                    <Ionicons name="close" size={12} color={c.textMuted} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Availability */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Availability</Text>
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.toggleLabel}>Open to Work</Text>
+                <Text style={styles.toggleSub}>Let employers know you&apos;re available</Text>
+              </View>
+              <Switch
+                value={openToWork}
+                onValueChange={setOpenToWork}
+                trackColor={{ false: c.border2, true: c.accent }}
+                thumbColor="#fff"
+              />
+            </View>
+          </View>
+
+          <View style={{ height: 32 }} />
+        </ScrollView>
       )}
     </View>
   );
 }
 
-function Field({ c, label, value, onChangeText, placeholder, keyboardType }: { c: any; label: string; value: string; onChangeText: (t: string) => void; placeholder?: string; keyboardType?: any }) {
+function Field({ c, label, value, onChangeText, placeholder, keyboardType }: {
+  c: any; label: string; value: string;
+  onChangeText: (t: string) => void; placeholder?: string; keyboardType?: any
+}) {
   return (
     <View style={{ marginBottom: 16 }}>
       <Text style={{ color: c.textMuted, fontSize: 12, marginBottom: 6 }}>{label}</Text>
-      <TextInput style={{ backgroundColor: c.bg, borderWidth: 1, borderColor: c.border2, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, color: c.text, fontSize: 14 }} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={c.textDim} keyboardType={keyboardType ?? 'default'} />
+      <TextInput
+        style={{ backgroundColor: c.bg, borderWidth: 1, borderColor: c.border2, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, color: c.text, fontSize: 14 }}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={c.textDim}
+        keyboardType={keyboardType ?? 'default'}
+        autoCapitalize="none"
+      />
     </View>
   );
 }
@@ -202,7 +282,6 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     avatarText: { color: '#fff', fontSize: 34, fontWeight: '800' },
     changePhotoText: { color: c.accent, fontSize: 14, fontWeight: '600' },
     card: { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 16, padding: 16, marginBottom: 16 },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
     cardTitle: { color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 14 },
     input: { backgroundColor: c.bg, borderWidth: 1, borderColor: c.border2, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, color: c.text, fontSize: 14 },
     textarea: { minHeight: 110, textAlignVertical: 'top', lineHeight: 22, marginBottom: 4 },
@@ -212,11 +291,12 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     chip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: c.border2, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
     chipText: { color: c.textSub, fontSize: 13 },
-    expRole: { color: c.textSub, fontSize: 14, fontWeight: '600', marginBottom: 2 },
+    toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    toggleLabel: { color: c.text, fontSize: 14, fontWeight: '600', marginBottom: 2 },
+    toggleSub: { color: c.textMuted, fontSize: 12 },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40, gap: 12 },
     emptyText: { color: c.textMuted, fontSize: 16, fontWeight: '600' },
     retryBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10, backgroundColor: c.accentBg, borderWidth: 1, borderColor: c.accentBorder },
     retryText: { color: c.accent, fontWeight: '600' },
-    expMeta: { color: c.textMuted, fontSize: 12 },
   });
 }
