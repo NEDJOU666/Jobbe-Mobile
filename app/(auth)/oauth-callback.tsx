@@ -19,7 +19,7 @@ export default function OAuthCallbackScreen() {
       if (refresh_token) await secureStorage.setRefreshToken(refresh_token);
       await hydrate();
 
-      const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000/api';
+      const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3004/api';
       const res = await fetch(`${API_BASE}/profile`, {
         headers: { Authorization: `Bearer ${access_token}` },
       }).catch(() => null);
