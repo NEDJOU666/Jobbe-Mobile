@@ -78,7 +78,7 @@ export default function OnboardingScreen() {
         body: form,
       });
     } catch {
-      // non-fatal
+      Alert.alert('Upload Failed', 'Could not upload your CV. You can add it later from your profile.');
     } finally {
       setUploading(false);
     }

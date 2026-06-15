@@ -94,12 +94,16 @@ export default function InboxTab() {
     }
   }, [paramAppId, threads, isLoading]);
 
-  // After first message sent, thread appears in inbox — update header with firm logo
+  // After first message sent, thread appears in inbox — update header with real firm name + logo
   useEffect(() => {
     if (!active) return;
     const match = threads.find((t) => t.applicationId === active.applicationId);
-    if (match && !active.firmLogo && match.firm.logo) {
-      setActive((a) => a ? { ...a, firmLogo: match.firm.logo } : a);
+    if (match) {
+      setActive((a) => a ? {
+        ...a,
+        firmName: match.firm.name,
+        firmLogo: match.firm.logo ?? a.firmLogo,
+      } : a);
     }
   }, [threads]);
 
