@@ -2,13 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useMemo } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { fs, isSmall } from '@/lib/scale';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '@/hooks/useTheme';
 import { useJob } from '@/hooks/useJobs';
 import { useToggleSave, useSaved } from '@/hooks/useSaved';
 import { useCheckApplied } from '@/hooks/useApplications';
+import { useCredits } from '@/hooks/useCredits';
 
 const EMP: Record<string, string> = { FULL_TIME: 'Full-time', PART_TIME: 'Part-time', CONTRACT: 'Contract', INTERNSHIP: 'Internship' };
 const LOC: Record<string, string> = { REMOTE: 'Remote', ONSITE: 'On-site', HYBRID: 'Hybrid' };
@@ -31,14 +33,27 @@ export default function JobDetailScreen() {
   const { data: savedJobs = [] } = useSaved();
   const { mutate: toggleSave } = useToggleSave();
   const { data: appliedData } = useCheckApplied(id ?? '');
+  const { data: creditsData } = useCredits();
 
-  const saved = savedJobs.some((j) => j.id === id);
+  const saved = savedJobs.some((s) => s.post?.id === id);
   const applied = appliedData?.applied ?? false;
 
   const handleSave = () => {
     toggleSave(id ?? '', {
       onSuccess: () => qc.invalidateQueries({ queryKey: ['saved'] }),
     });
+  };
+
+  const handleShare = async () => {
+    if (!job) return;
+    const url = `https://jobfinder.oxbiy.com/jobs/${job.id}`;
+    try {
+      await Share.share({
+        title: job.title,
+        message: `${job.title} at ${job.firm?.name ?? 'a company'}\n\n${url}`,
+        url,
+      });
+    } catch {}
   };
 
   const handleApply = () => {
@@ -70,7 +85,7 @@ export default function JobDetailScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', paddingTop: insets.top }]}>
         <ActivityIndicator color={c.accent} size="large" />
       </View>
     );
@@ -78,7 +93,7 @@ export default function JobDetailScreen() {
 
   if (isError || !job) {
     return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', gap: 12 }]}>
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: insets.top }]}>
         <Ionicons name="cloud-offline-outline" size={48} color={c.border3} />
         <Text style={{ color: c.textMuted }}>Could not load job</Text>
         <TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: c.accentBg, borderRadius: 10 }}>
@@ -88,10 +103,14 @@ export default function JobDetailScreen() {
     );
   }
 
-  const { title, description, employmentType, locationType, properties, firm, _count, viewCount, applicationDeadline, applyType } = job;
-  const isScraped = !!(job as any).source;
-  const { salaryMin, salaryMax, currency = 'XAF', skills = [], requirements = [], benefits = [], experienceLevel, scrapedCompany } = properties as any;
+  const { title, description, postType, employmentType, locationType, location, properties, firm, _count, viewCount, applicationDeadline, applyType, source, sourceUrl } = job;
+  const creditCost: number = job.creditCost ?? 1;
+  const creditBalance = creditsData?.balance ?? null;
+  const canAfford = creditBalance === null || creditBalance >= creditCost;
+  const isScraped = !!source;
+  const { salaryMin, salaryMax, currency = 'XAF', skills = [], requirements = [], benefits = [], experienceLevel, scrapedCompany, education, experience } = properties ?? {};
   const displayCompany = isScraped && scrapedCompany ? scrapedCompany : firm.name;
+  const displayLocation = location || (isScraped ? '' : `${firm.city}, ${firm.country}`);
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
@@ -104,7 +123,7 @@ export default function JobDetailScreen() {
           <TouchableOpacity style={styles.iconBtn} onPress={handleSave}>
             <Ionicons name={saved ? 'heart' : 'heart-outline'} size={20} color={saved ? c.accent : c.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}>
+          <TouchableOpacity style={styles.iconBtn} onPress={handleShare}>
             <Ionicons name="share-social-outline" size={20} color={c.text} />
           </TouchableOpacity>
         </View>
@@ -118,7 +137,7 @@ export default function JobDetailScreen() {
               <Ionicons name="hardware-chip-outline" size={24} color="#F59E0B" />
             </View>
           ) : (
-            <View style={styles.companyAvatar}><Text style={styles.companyInitial}>{firm.name.charAt(0)}</Text></View>
+            <View style={styles.companyAvatar}><Text style={styles.companyInitial}>{firm.name?.charAt(0)?.toUpperCase() ?? '?'}</Text></View>
           )}
           <View style={styles.companyInfo}>
             <View style={styles.companyNameRow}>
@@ -132,12 +151,29 @@ export default function JobDetailScreen() {
 
         <Text style={styles.jobTitle}>{title}</Text>
 
+        {/* Location text */}
+        {displayLocation ? (
+          <View style={styles.locationRow}>
+            <Ionicons name="location-outline" size={14} color={c.textMuted} />
+            <Text style={styles.locationText}>{displayLocation}</Text>
+          </View>
+        ) : null}
+
         {/* Chips */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
           <View style={styles.chipsRow}>
+            {postType === 'INTERNSHIP' && (
+              <View style={[styles.chip, styles.internshipChip]}><Text style={[styles.chipText, styles.internshipChipText]}>Internship</Text></View>
+            )}
             {[EMP[employmentType], LOC[locationType], experienceLevel ? LVL[experienceLevel] : null].filter(Boolean).map((chip) => (
               <View key={chip} style={styles.chip}><Text style={styles.chipText}>{chip}</Text></View>
             ))}
+            {creditCost > 0 && (
+              <View style={styles.creditChip}>
+                <Ionicons name="wallet-outline" size={12} color="#92400e" />
+                <Text style={styles.creditChipText}>{creditCost} credit{creditCost !== 1 ? 's' : ''} to apply</Text>
+              </View>
+            )}
           </View>
         </ScrollView>
 
@@ -220,6 +256,28 @@ export default function JobDetailScreen() {
           </View>
         )}
 
+        {/* Education requirement */}
+        {education ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Education</Text>
+            <View style={styles.infoBox}>
+              <Ionicons name="school-outline" size={18} color={c.accent} />
+              <Text style={styles.infoBoxText}>{education}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Experience requirement */}
+        {experience ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Experience</Text>
+            <View style={styles.infoBox}>
+              <Ionicons name="briefcase-outline" size={18} color={c.accent} />
+              <Text style={styles.infoBoxText}>{experience}</Text>
+            </View>
+          </View>
+        ) : null}
+
         {/* About firm */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About {displayCompany}</Text>
@@ -252,16 +310,31 @@ export default function JobDetailScreen() {
 
         {applied ? (
           <View style={[styles.applyBtn, styles.appliedBtn]}>
-            <Ionicons name="checkmark-circle" size={18} color={c.accent} />
-            <Text style={[styles.applyBtnText, { color: c.accent }]}>Applied</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="checkmark-circle" size={18} color={c.accent} />
+              <Text style={[styles.applyBtnText, { color: c.accent }]}>Applied</Text>
+            </View>
           </View>
         ) : (
-          <TouchableOpacity style={styles.applyBtn} activeOpacity={0.85} onPress={handleApply}>
-            <Text style={styles.applyBtnText}>
-              {applyType === 'EXTERNAL' ? 'Apply on Website' : 'Apply Now'}
-            </Text>
-            {applyType === 'EXTERNAL' && (
-              <Ionicons name="open-outline" size={16} color="#fff" style={{ marginLeft: 6 }} />
+          <TouchableOpacity
+            style={[styles.applyBtn, !canAfford && styles.applyBtnWarn]}
+            activeOpacity={0.85}
+            onPress={canAfford ? handleApply : () => router.push('/credits')}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.applyBtnText}>
+                {!canAfford ? 'Buy Credits' : applyType === 'EXTERNAL' ? 'Apply on Website' : 'Apply Now'}
+              </Text>
+              {applyType === 'EXTERNAL' && canAfford && (
+                <Ionicons name="open-outline" size={15} color="#fff" />
+              )}
+            </View>
+            {creditCost > 0 && (
+              <Text style={styles.applyBtnSub}>
+                {canAfford
+                  ? `· ${creditCost} credit${creditCost !== 1 ? 's' : ''}${creditBalance !== null ? `  ·  balance: ${creditBalance}` : ''}`
+                  : `Need ${creditCost} credit${creditCost !== 1 ? 's' : ''} to apply`}
+              </Text>
             )}
           </TouchableOpacity>
         )}
@@ -284,12 +357,12 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     companyNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     companyName: { color: c.textSub, fontSize: 15, fontWeight: '600' },
     companyMeta: { color: c.textMuted, fontSize: 12, marginTop: 2 },
-    jobTitle: { fontSize: 24, fontWeight: '800', color: c.text, lineHeight: 30, marginBottom: 14 },
-    chipsRow: { flexDirection: 'row', gap: 8 },
-    chip: { borderWidth: 1, borderColor: c.border2, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
-    chipText: { color: c.textBody, fontSize: 13 },
+    jobTitle: { fontSize: fs(isSmall ? 20 : 24), fontWeight: '800', color: c.text, lineHeight: fs(isSmall ? 26 : 30), marginBottom: 14 },
+    chipsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+    chip: { borderWidth: 1, borderColor: c.border2, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, flexShrink: 0 },
+    chipText: { color: c.textBody, fontSize: fs(12), flexShrink: 0 },
     salaryCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.accentBg, borderWidth: 1, borderColor: c.accentBorder, borderRadius: 12, padding: 14, marginBottom: 16 },
-    salaryText: { color: c.accent, fontSize: 17, fontWeight: '700' },
+    salaryText: { color: c.accent, fontSize: fs(17), fontWeight: '700' },
     salaryPeriod: { fontSize: 13, fontWeight: '400', color: c.accent, opacity: 0.6 },
     statsRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 24, gap: 12 },
     statItem: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center' },
@@ -312,8 +385,18 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     firmGridValue: { color: c.textSub, fontSize: 13, fontWeight: '500' },
     cta: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.bg },
     saveBtn: { width: 50, height: 50, borderRadius: 14, borderWidth: 1.5, borderColor: c.accent, alignItems: 'center', justifyContent: 'center' },
-    applyBtn: { flex: 1, height: 50, borderRadius: 14, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+    applyBtn: { flex: 1, minHeight: 52, borderRadius: 14, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
+    applyBtnWarn: { backgroundColor: '#E65100' },
     appliedBtn: { backgroundColor: c.accentBg, borderWidth: 1.5, borderColor: c.accent },
     applyBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    applyBtnSub: { color: 'rgba(255,255,255,0.72)', fontSize: 11, fontWeight: '500', marginTop: 2 },
+    creditChip: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#fbbf2480', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fef3c7', flexShrink: 0 },
+    creditChipText: { color: '#92400e', fontSize: 12, fontWeight: '700' },
+    locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 12 },
+    locationText: { color: c.textMuted, fontSize: 13 },
+    internshipChip: { backgroundColor: '#f3e8ff', borderColor: '#d8b4fe' },
+    internshipChipText: { color: '#7c3aed' },
+    infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: c.accentBg, borderWidth: 1, borderColor: c.accentBorder, borderRadius: 12, padding: 14 },
+    infoBoxText: { color: c.textBody, fontSize: 14, lineHeight: 22, flex: 1 },
   });
 }

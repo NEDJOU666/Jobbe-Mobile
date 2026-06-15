@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
+import { fs, sp, isSmall } from '@/lib/scale';
 
 export interface Job {
   id: string; title: string; description: string;
@@ -36,7 +37,9 @@ interface Props {
   onHide?: (id: string) => void;
 }
 
-export function JobCard({ job, onPress, onSave, onHide }: Props) {
+const HIT = { top: 10, bottom: 10, left: 10, right: 10 };
+
+function JobCardInner({ job, onPress, onSave, onHide }: Props) {
   const { colors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [saved, setSaved] = useState(job.isSaved ?? false);
@@ -45,7 +48,7 @@ export function JobCard({ job, onPress, onSave, onHide }: Props) {
 
   if (hidden) return null;
 
-  const { salaryMin, salaryMax, currency = 'XAF', skills = [], experienceLevel } = job.properties;
+  const { salaryMin, salaryMax, currency = 'XAF', skills = [], experienceLevel } = job.properties ?? {};
 
   const details = [
     EMP[job.employmentType],
@@ -60,7 +63,10 @@ export function JobCard({ job, onPress, onSave, onHide }: Props) {
     onSave?.(job.id, next);
   };
 
-  const firmInitial = job.firm.name.charAt(0).toUpperCase();
+  const firmInitial = (job as any).properties?.scrapedCompany?.charAt(0)?.toUpperCase()
+    ?? job.firm?.name?.charAt(0)?.toUpperCase() ?? '?';
+  const displayFirmName = (job as any).properties?.scrapedCompany || job.firm?.name || '—';
+  const displayFirmCity = job.firm?.city || (job as any).location || '';
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.92}>
@@ -103,8 +109,8 @@ export function JobCard({ job, onPress, onSave, onHide }: Props) {
       <View style={styles.footer}>
         <View style={styles.firmAvatar}><Text style={styles.firmInitial}>{firmInitial}</Text></View>
         <View style={styles.firmInfo}>
-          <Text style={styles.firmName} numberOfLines={1}>{job.firm.name}</Text>
-          <Text style={styles.firmCity} numberOfLines={1}>{job.firm.city}</Text>
+          <Text style={styles.firmName} numberOfLines={1}>{displayFirmName}</Text>
+          {displayFirmCity ? <Text style={styles.firmCity} numberOfLines={1}>{displayFirmCity}</Text> : null}
         </View>
         {(job.firm.isVerified || job.firm.status === 'VERIFIED') && (
           <View style={styles.verifiedBadge}>
@@ -122,19 +128,19 @@ export function JobCard({ job, onPress, onSave, onHide }: Props) {
   );
 }
 
-const HIT = { top: 10, bottom: 10, left: 10, right: 10 };
+export const JobCard = memo(JobCardInner);
 
 function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['colors']) {
   return StyleSheet.create({
-    card: { backgroundColor: c.card, marginHorizontal: 14, marginBottom: 10, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: c.border },
+    card: { backgroundColor: c.card, marginHorizontal: sp(isSmall ? 10 : 14), marginBottom: sp(10), borderRadius: 16, padding: sp(isSmall ? 12 : 16), borderWidth: 1, borderColor: c.border },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-    meta: { color: c.textMuted, fontSize: 12, flex: 1, marginRight: 8 },
+    meta: { color: c.textMuted, fontSize: fs(12), flex: 1, marginRight: 8 },
     actions: { flexDirection: 'row', gap: 6 },
     actionBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: c.border2, alignItems: 'center', justifyContent: 'center' },
-    title: { fontSize: 17, fontWeight: '700', color: c.text, lineHeight: 23, marginBottom: 6 },
-    details: { fontSize: 12, color: c.textBody, lineHeight: 18, marginBottom: 10 },
-    desc: { fontSize: 13, color: c.textBody, lineHeight: 20, marginBottom: 2 },
-    more: { color: c.accent, fontSize: 13, fontWeight: '600', marginBottom: 2 },
+    title: { fontSize: fs(isSmall ? 15 : 17), fontWeight: '700', color: c.text, lineHeight: fs(isSmall ? 21 : 23), marginBottom: 6 },
+    details: { fontSize: fs(12), color: c.textBody, lineHeight: fs(18), marginBottom: 10 },
+    desc: { fontSize: fs(13), color: c.textBody, lineHeight: fs(20), marginBottom: 2 },
+    more: { color: c.accent, fontSize: fs(13), fontWeight: '600', marginBottom: 2 },
     skillRow: { flexDirection: 'row', gap: 7 },
     skillChip: { borderWidth: 1, borderColor: c.border2, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
     skillText: { color: c.textSub, fontSize: 12, fontWeight: '500' },

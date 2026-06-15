@@ -1,4 +1,5 @@
 import { useApply } from '@/hooks/useApplications';
+import { useCredits } from '@/hooks/useCredits';
 import { useDocuments } from '@/hooks/useDocuments';
 import { useJob } from '@/hooks/useJobs';
 import { useTheme } from '@/hooks/useTheme';
@@ -6,10 +7,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator, Alert, BackHandler, KeyboardAvoidingView, Platform,
+  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const STEPS = ['Resume', 'Cover Letter', 'Review'];
+const STEPS = ['Documents', 'Cover Letter', 'Review'];
 
 export default function ApplyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,36 +24,63 @@ export default function ApplyScreen() {
 
   const { data: job } = useJob(postId);
   const { data: docs = [] } = useDocuments();
+  const { data: creditsData } = useCredits();
   const { mutate: apply, isPending } = useApply();
 
   const resumes = useMemo(() => docs.filter((d) => d.documentType === 'RESUME'), [docs]);
+  const otherDocs = useMemo(() => docs.filter((d) => d.documentType !== 'RESUME'), [docs]);
   const defaultResume = useMemo(() => resumes.find((d) => d.isDefault) ?? resumes[0], [resumes]);
 
   const [step, setStep] = useState(0);
-  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [coverLetter, setCoverLetter] = useState('');
+  const [salaryExpectation, setSalaryExpectation] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
-    if (!selectedDocId && defaultResume) setSelectedDocId(defaultResume.id);
-  }, [defaultResume, selectedDocId]);
+    setSelectedDocIds((prev) => prev.length === 0 && defaultResume ? [defaultResume.id] : prev);
+  }, [defaultResume]);
 
-  const selectedDoc = docs.find((d) => d.id === selectedDocId);
+  const toggleDoc = (docId: string) => {
+    setSelectedDocIds((prev) =>
+      prev.includes(docId) ? prev.filter((d) => d !== docId) : [...prev, docId],
+    );
+  };
+
+  const selectedDocs = docs.filter((d) => selectedDocIds.includes(d.id));
   const goNext = () => setStep((s) => s + 1);
   const goBack = () => { if (step === 0) router.back(); else setStep((s) => s - 1); };
+  const creditBalance = creditsData?.balance ?? 0;
+
+  // Hardware back button: step backwards through wizard instead of exiting
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      goBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [step]); // re-register when step changes so closure has correct step
 
   const handleSubmit = () => {
     if (!postId) {
       Alert.alert('Invalid job', 'This job link is invalid. Please go back and try again.');
       return;
     }
+    const documents = selectedDocs.filter((d) => d.url != null).map((d) => ({ name: d.name, url: d.url as string }));
+    const salaryNum = salaryExpectation ? parseInt(salaryExpectation, 10) : undefined;
     apply(
-      { postId, coverLetter, resumeName: selectedDoc?.name },
+      {
+        postId,
+        coverLetter: coverLetter.trim() || undefined,
+        documents: documents.length > 0 ? documents : undefined,
+        salaryExpectation: salaryNum && !isNaN(salaryNum) ? salaryNum : undefined,
+      },
       {
         onSuccess: () => setSubmitted(true),
         onError: (err: any) => {
-          const msg = err?.response?.data?.message ?? err?.response?.data?.error ?? 'Submission failed. Please try again.';
-          Alert.alert('Application failed', msg);
+          const raw = err?.response?.data?.message;
+          const msg = Array.isArray(raw) ? raw.join('\n') : (raw ?? err?.response?.data?.error ?? 'Submission failed. Please try again.');
+          Alert.alert('Application failed', String(msg));
         },
       },
     );
@@ -63,10 +94,10 @@ export default function ApplyScreen() {
             <Ionicons name="close" size={20} color={c.text} />
           </TouchableOpacity>
         </View>
-        <View style={styles.successWrap}>
+        <View style={styles.centerWrap}>
           <Ionicons name="alert-circle-outline" size={48} color={c.textMuted} />
           <Text style={styles.successTitle}>Invalid job</Text>
-          <Text style={styles.successMsg}>This job link is invalid. Please go back and pick a job from the list.</Text>
+          <Text style={styles.successMsg}>This job link is invalid. Please go back and pick a job.</Text>
         </View>
       </View>
     );
@@ -80,10 +111,12 @@ export default function ApplyScreen() {
             <Ionicons name="close" size={20} color={c.text} />
           </TouchableOpacity>
         </View>
-        <View style={styles.successWrap}>
+        <View style={styles.centerWrap}>
           <View style={styles.successCircle}><Ionicons name="checkmark" size={48} color={c.accent} /></View>
           <Text style={styles.successTitle}>Application Sent!</Text>
-          <Text style={styles.successMsg}>Your application has been submitted to {job?.firm?.name ?? 'the company'}. They'll review it and get back to you.</Text>
+          <Text style={styles.successMsg}>
+            Your application has been submitted to {job?.firm?.name ?? 'the company'}. {"They'll"} review it and get back to you.
+          </Text>
           <TouchableOpacity style={styles.doneBtn} onPress={() => router.replace('/(tabs)')} activeOpacity={0.85}>
             <Text style={styles.doneBtnText}>Back to Jobs</Text>
           </TouchableOpacity>
@@ -93,7 +126,8 @@ export default function ApplyScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+    <KeyboardAvoidingView style={[styles.container, { paddingBottom: insets.bottom }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity style={styles.iconBtn} onPress={goBack}>
           <Ionicons name={step === 0 ? 'close' : 'arrow-back'} size={20} color={c.text} />
@@ -123,34 +157,64 @@ export default function ApplyScreen() {
         })}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {step === 0 && <StepResume c={c} styles={styles} docs={resumes} selectedDoc={selectedDocId} onSelect={setSelectedDocId} />}
-        {step === 1 && <StepCoverLetter c={c} styles={styles} value={coverLetter} onChange={setCoverLetter} />}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        {step === 0 && (
+          <StepDocuments
+            c={c} styles={styles}
+            allDocs={docs}
+            resumes={resumes}
+            otherDocs={otherDocs}
+            selectedIds={selectedDocIds}
+            onToggle={toggleDoc}
+          />
+        )}
+        {step === 1 && (
+          <StepCoverLetter
+            c={c} styles={styles}
+            coverLetter={coverLetter}
+            onChangeCover={setCoverLetter}
+            salaryExpectation={salaryExpectation}
+            onChangeSalary={setSalaryExpectation}
+            job={job}
+          />
+        )}
         {step === 2 && (
           <StepReview
-            c={c}
-            styles={styles}
-            doc={selectedDoc}
+            c={c} styles={styles}
+            selectedDocs={selectedDocs}
             coverLetter={coverLetter}
+            salaryExpectation={salaryExpectation}
             jobTitle={job?.title ?? '—'}
             firm={(job as any)?.source
               ? ((job as any)?.properties?.scrapedCompany ?? job?.firm?.name ?? '—')
               : (job?.firm?.name ?? '—')}
             isScrapedNoEmail={!!(job as any)?.source && !(job as any)?.properties?.applyEmail}
             sourceUrl={(job as any)?.sourceUrl}
+            creditBalance={creditBalance}
           />
         )}
         <View style={{ height: 110 }} />
       </ScrollView>
 
+      {/* CTA */}
       <View style={[styles.cta, { paddingBottom: insets.bottom + 12 }]}>
         {step < 2 ? (
-          <TouchableOpacity style={[styles.nextBtn, step === 0 && !selectedDocId && styles.btnDisabled]} activeOpacity={0.85} disabled={step === 0 && !selectedDocId} onPress={goNext}>
+          <TouchableOpacity
+            style={[styles.nextBtn, step === 0 && selectedDocIds.length === 0 && docs.length > 0 && styles.btnDisabled]}
+            activeOpacity={0.85}
+            disabled={step === 0 && selectedDocIds.length === 0 && docs.length > 0}
+            onPress={goNext}
+          >
             <Text style={styles.nextBtnText}>Continue</Text>
             <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 6 }} />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={[styles.nextBtn, isPending && styles.btnDisabled]} activeOpacity={0.85} disabled={isPending} onPress={handleSubmit}>
+          <TouchableOpacity
+            style={[styles.nextBtn, (isPending || (creditsData !== undefined && creditBalance < 1)) && styles.btnDisabled]}
+            activeOpacity={0.85}
+            disabled={isPending || (creditsData !== undefined && creditBalance < 1)}
+            onPress={handleSubmit}
+          >
             {isPending
               ? <ActivityIndicator color="#fff" size="small" />
               : <><Text style={styles.nextBtnText}>Submit Application</Text><Ionicons name="send" size={16} color="#fff" style={{ marginLeft: 8 }} /></>
@@ -158,86 +222,222 @@ export default function ApplyScreen() {
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
-function StepResume({ c, styles, docs, selectedDoc, onSelect }: { c: any; styles: any; docs: any[]; selectedDoc: string | null; onSelect: (id: string) => void }) {
+function StepDocuments({ c, styles, allDocs, resumes, otherDocs, selectedIds, onToggle }: {
+  c: any; styles: any;
+  allDocs: any[]; resumes: any[]; otherDocs: any[];
+  selectedIds: string[]; onToggle: (id: string) => void;
+}) {
   return (
     <View>
-      <Text style={styles.sectionTitle}>Select your resume</Text>
-      <Text style={styles.sectionHint}>Choose one of your uploaded documents</Text>
-      {docs.length === 0 && (
-        <View style={{ padding: 20, alignItems: 'center', gap: 8 }}>
+      <Text style={styles.sectionTitle}>Your Documents</Text>
+      <Text style={styles.sectionHint}>
+        Select one or more documents to attach. {selectedIds.length > 0 ? `${selectedIds.length} selected.` : ''}
+      </Text>
+
+      {allDocs.length === 0 ? (
+        <View style={styles.emptyDocs}>
           <Ionicons name="document-outline" size={40} color={c.border3} />
-          <Text style={{ color: c.textMuted, fontSize: 13 }}>No resumes uploaded yet</Text>
-        </View>
-      )}
-      {docs.map((doc) => {
-        const selected = selectedDoc === doc.id;
-        return (
-          <TouchableOpacity key={doc.id} style={[styles.docCard, selected && styles.docCardSelected]} onPress={() => onSelect(doc.id)} activeOpacity={0.8}>
-            <View style={[styles.docIcon, { backgroundColor: selected ? c.accentBg : c.card2 }]}>
-              <Ionicons name="document-text-outline" size={22} color={selected ? c.accent : c.textMuted} />
-            </View>
-            <View style={styles.docInfo}>
-              <Text style={styles.docName}>{doc.name}</Text>
-              <Text style={styles.docSize}>{doc.size ?? ''}</Text>
-            </View>
-            <View style={[styles.radio, selected && styles.radioSelected]}>
-              {selected && <View style={styles.radioDot} />}
-            </View>
+          <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>No documents uploaded yet.{'\n'}Upload your CV in the Documents section.</Text>
+          <TouchableOpacity style={styles.uploadBtn} onPress={() => router.push('/documents')}>
+            <Ionicons name="add-circle-outline" size={18} color={c.accent} />
+            <Text style={styles.uploadText}>Go to Documents</Text>
           </TouchableOpacity>
-        );
-      })}
-      <TouchableOpacity style={styles.uploadBtn} onPress={() => router.push('/documents')}>
-        <Ionicons name="add-circle-outline" size={20} color={c.accent} />
-        <Text style={styles.uploadText}>Upload new resume</Text>
-      </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          {resumes.length > 0 && (
+            <>
+              <Text style={styles.docGroupLabel}>CV / Resume</Text>
+              {resumes.map((doc) => {
+                const selected = selectedIds.includes(doc.id);
+                return (
+                  <TouchableOpacity key={doc.id} style={[styles.docCard, selected && styles.docCardSelected]} onPress={() => onToggle(doc.id)} activeOpacity={0.8}>
+                    <View style={[styles.docIcon, { backgroundColor: selected ? c.accentBg : c.card2 }]}>
+                      <Ionicons name="document-text-outline" size={22} color={selected ? c.accent : c.textMuted} />
+                    </View>
+                    <View style={styles.docInfo}>
+                      <Text style={styles.docName}>{doc.name}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                        {doc.isDefault && <View style={styles.defaultBadge}><Text style={styles.defaultBadgeText}>Default</Text></View>}
+                        {doc.size ? <Text style={styles.docSize}>{doc.size}</Text> : null}
+                      </View>
+                    </View>
+                    <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
+                      {selected && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </>
+          )}
+          {otherDocs.length > 0 && (
+            <>
+              <Text style={[styles.docGroupLabel, { marginTop: 14 }]}>Other Documents</Text>
+              {otherDocs.map((doc) => {
+                const selected = selectedIds.includes(doc.id);
+                return (
+                  <TouchableOpacity key={doc.id} style={[styles.docCard, selected && styles.docCardSelected]} onPress={() => onToggle(doc.id)} activeOpacity={0.8}>
+                    <View style={[styles.docIcon, { backgroundColor: selected ? c.accentBg : c.card2 }]}>
+                      <Ionicons name="attach-outline" size={22} color={selected ? c.accent : c.textMuted} />
+                    </View>
+                    <View style={styles.docInfo}>
+                      <Text style={styles.docName}>{doc.name}</Text>
+                      <Text style={styles.docSize}>{doc.documentType?.replace(/_/g, ' ') ?? ''}</Text>
+                    </View>
+                    <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
+                      {selected && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </>
+          )}
+          <TouchableOpacity style={styles.addMoreBtn} onPress={() => router.push('/documents')}>
+            <Ionicons name="add-circle-outline" size={18} color={c.accent} />
+            <Text style={styles.uploadText}>Upload new document</Text>
+          </TouchableOpacity>
+        </>
+      )}
+      <Text style={styles.docHint}>PDF, DOC, DOCX, JPG, PNG supported</Text>
     </View>
   );
 }
 
-function StepCoverLetter({ c, styles, value, onChange }: { c: any; styles: any; value: string; onChange: (t: string) => void }) {
+function StepCoverLetter({ c, styles, coverLetter, onChangeCover, salaryExpectation, onChangeSalary, job }: {
+  c: any; styles: any;
+  coverLetter: string; onChangeCover: (t: string) => void;
+  salaryExpectation: string; onChangeSalary: (t: string) => void;
+  job: any;
+}) {
+  const hasSalary = job?.properties?.salaryMin || job?.properties?.salaryMax;
   return (
     <View>
-      <Text style={styles.sectionTitle}>Cover letter</Text>
+      <Text style={styles.sectionTitle}>Cover Letter</Text>
       <Text style={styles.sectionHint}>Optional — tell the recruiter why you're the right fit</Text>
-      <TextInput style={styles.textarea} placeholder="e.g. I'm excited about this role because..." placeholderTextColor={c.textDim} value={value} onChangeText={(t) => t.length <= 1000 && onChange(t)} multiline numberOfLines={8} textAlignVertical="top" />
-      <Text style={styles.charCount}>{value.length} / 1000</Text>
+      <TextInput
+        style={styles.textarea}
+        placeholder="Briefly describe why you're a great fit for this role…"
+        placeholderTextColor={c.textDim}
+        value={coverLetter}
+        onChangeText={(t) => t.length <= 1000 && onChangeCover(t)}
+        multiline
+        numberOfLines={8}
+        textAlignVertical="top"
+      />
+      <Text style={styles.charCount}>{coverLetter.length} / 1000</Text>
+
       <View style={styles.tipCard}>
         <Ionicons name="bulb-outline" size={16} color="#F57F17" />
         <Text style={styles.tipText}>Keep it short (3–5 sentences). Mention the role, your key skill, and why this company.</Text>
       </View>
+
+      {/* Salary Expectation */}
+      <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Salary Expectation</Text>
+      <Text style={styles.sectionHint}>
+        Optional{hasSalary ? ` — posted range: ${job.properties?.currency ?? 'XAF'} ${job.properties?.salaryMin?.toLocaleString() ?? '?'}${job.properties?.salaryMax ? ` – ${job.properties.salaryMax.toLocaleString()}` : '+'}` : ''}
+      </Text>
+      <View style={styles.inputRow}>
+        <Text style={styles.currencyLabel}>XAF</Text>
+        <TextInput
+          style={[styles.input, { flex: 1 }]}
+          placeholder="e.g. 200000"
+          placeholderTextColor={c.textDim}
+          value={salaryExpectation}
+          onChangeText={(t) => onChangeSalary(t.replace(/\D/g, ''))}
+          keyboardType="numeric"
+          returnKeyType="done"
+        />
+        {salaryExpectation.length > 0 && (
+          <TouchableOpacity onPress={() => onChangeSalary('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close-circle" size={16} color={c.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
 
-function StepReview({ c, styles, doc, coverLetter, jobTitle, firm, isScrapedNoEmail, sourceUrl }: {
-  c: any; styles: any; doc?: { name: string; size?: string | null };
-  coverLetter: string; jobTitle: string; firm: string;
-  isScrapedNoEmail?: boolean; sourceUrl?: string;
+function StepReview({ c, styles, selectedDocs, coverLetter, salaryExpectation, jobTitle, firm, isScrapedNoEmail, sourceUrl, creditBalance }: {
+  c: any; styles: any;
+  selectedDocs: any[];
+  coverLetter: string; salaryExpectation: string; jobTitle: string; firm: string;
+  isScrapedNoEmail?: boolean; sourceUrl?: string; creditBalance: number;
 }) {
+  const APPLY_COST = 1;
+  const hasEnough = creditBalance >= APPLY_COST;
+
   return (
-    <View style={{ gap: 16 }}>
+    <View style={{ gap: 14 }}>
       <Text style={styles.sectionTitle}>Review your application</Text>
       <Text style={styles.sectionHint}>Check everything before submitting</Text>
-      <View style={styles.reviewRow}><Text style={styles.reviewLabel}>Position</Text><Text style={styles.reviewValue}>{jobTitle}</Text></View>
-      <View style={styles.reviewRow}><Text style={styles.reviewLabel}>Company</Text><Text style={styles.reviewValue}>{firm}</Text></View>
+
+      {/* Credit cost banner */}
+      <View style={[styles.creditCard, !hasEnough && styles.creditCardWarn]}>
+        <Ionicons name="wallet-outline" size={18} color={hasEnough ? c.accent : '#E65100'} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.creditCost, !hasEnough && { color: '#E65100' }]}>
+            {APPLY_COST} credit will be spent to submit
+          </Text>
+          <Text style={[styles.creditBalance, !hasEnough && { color: '#E65100' }]}>
+            Your balance: <Text style={{ fontWeight: '800' }}>{creditBalance}</Text> credits
+            {!hasEnough ? ' — not enough!' : ''}
+          </Text>
+        </View>
+        {!hasEnough && (
+          <TouchableOpacity onPress={() => router.push('/credits')} activeOpacity={0.8}>
+            <Text style={{ color: '#E65100', fontWeight: '700', fontSize: 12 }}>Top up →</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Summary rows */}
       <View style={styles.reviewCard}>
-        <Text style={styles.reviewCardLabel}>Resume</Text>
-        <View style={styles.reviewDocRow}>
-          <Ionicons name="document-text-outline" size={18} color={c.accent} />
-          <Text style={styles.reviewDocName}>{doc?.name ?? '—'}</Text>
-          <Text style={styles.reviewDocSize}>{doc?.size}</Text>
+        <View style={styles.reviewRow}>
+          <Text style={styles.reviewLabel}>Position</Text>
+          <Text style={styles.reviewValue} numberOfLines={2}>{jobTitle}</Text>
+        </View>
+        <View style={[styles.reviewRow, { borderTopWidth: 1, borderTopColor: c.border }]}>
+          <Text style={styles.reviewLabel}>Company</Text>
+          <Text style={styles.reviewValue}>{firm}</Text>
         </View>
       </View>
+
+      {/* Documents */}
+      <View style={styles.reviewCard}>
+        <Text style={styles.reviewCardLabel}>Documents ({selectedDocs.length})</Text>
+        {selectedDocs.length > 0 ? (
+          selectedDocs.map((doc) => (
+            <View key={doc.id} style={styles.reviewDocRow}>
+              <Ionicons name="document-text-outline" size={16} color={c.accent} />
+              <Text style={styles.reviewDocName} numberOfLines={1}>{doc.name}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.reviewCoverEmpty}>No documents selected</Text>
+        )}
+      </View>
+
+      {/* Cover letter */}
       <View style={styles.reviewCard}>
         <Text style={styles.reviewCardLabel}>Cover Letter</Text>
         {coverLetter.trim()
           ? <Text style={styles.reviewCoverText} numberOfLines={5}>{coverLetter}</Text>
-          : <Text style={styles.reviewCoverEmpty}>No cover letter added</Text>}
+          : <Text style={styles.reviewCoverEmpty}>None added</Text>}
       </View>
+
+      {/* Salary expectation */}
+      {salaryExpectation ? (
+        <View style={styles.reviewCard}>
+          <Text style={styles.reviewCardLabel}>Salary Expectation</Text>
+          <Text style={styles.reviewValue}>XAF {parseInt(salaryExpectation, 10).toLocaleString()} / month</Text>
+        </View>
+      ) : null}
+
+      {/* Scraped notice */}
       {isScrapedNoEmail && sourceUrl && (
         <View style={styles.noticeCard}>
           <Ionicons name="information-circle-outline" size={18} color="#1e88e5" />
@@ -251,6 +451,7 @@ function StepReview({ c, styles, doc, coverLetter, jobTitle, firm, isScrapedNoEm
           </View>
         </View>
       )}
+
       <View style={styles.consentRow}>
         <Ionicons name="shield-checkmark-outline" size={16} color={c.textMuted} />
         <Text style={styles.consentText}>By submitting, you agree to share your profile and resume with the employer.</Text>
@@ -279,42 +480,53 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     stepLabelActive: { color: c.accent, fontWeight: '600' },
     scroll: { paddingHorizontal: 16, paddingTop: 4 },
     sectionTitle: { color: c.text, fontSize: 17, fontWeight: '700', marginBottom: 4 },
-    sectionHint: { color: c.textMuted, fontSize: 13, marginBottom: 16 },
-    docCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, backgroundColor: c.card, borderWidth: 1, borderColor: c.border2, marginBottom: 10 },
+    sectionHint: { color: c.textMuted, fontSize: 13, marginBottom: 14 },
+    emptyDocs: { alignItems: 'center', gap: 10, padding: 28, borderWidth: 1, borderColor: c.border2, borderRadius: 14, borderStyle: 'dashed', marginBottom: 12 },
+    docGroupLabel: { color: c.textMuted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+    docCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, backgroundColor: c.card, borderWidth: 1, borderColor: c.border2, marginBottom: 8 },
     docCardSelected: { borderColor: c.accent, backgroundColor: c.accentBg },
     docIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     docInfo: { flex: 1 },
     docName: { color: c.textSub, fontSize: 14, fontWeight: '600' },
-    docSize: { color: c.textMuted, fontSize: 12, marginTop: 2 },
-    radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: c.border2, alignItems: 'center', justifyContent: 'center' },
-    radioSelected: { borderColor: c.accent },
-    radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: c.accent },
-    uploadBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: c.border2, borderStyle: 'dashed', justifyContent: 'center' },
-    uploadText: { color: c.accent, fontSize: 14, fontWeight: '600' },
-    textarea: { backgroundColor: c.card, borderWidth: 1, borderColor: c.border2, borderRadius: 14, padding: 14, color: c.text, fontSize: 14, minHeight: 180, lineHeight: 22 },
+    docSize: { color: c.textMuted, fontSize: 12 },
+    defaultBadge: { backgroundColor: c.accentBg, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1, borderWidth: 1, borderColor: c.accentBorder },
+    defaultBadgeText: { color: c.accent, fontSize: 10, fontWeight: '700' },
+    checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: c.border2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    checkboxSelected: { backgroundColor: c.accent, borderColor: c.accent },
+    uploadBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: c.border2, borderStyle: 'dashed', justifyContent: 'center', marginTop: 8 },
+    addMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: c.border2, borderStyle: 'dashed', justifyContent: 'center', marginTop: 4 },
+    uploadText: { color: c.accent, fontSize: 13, fontWeight: '600' },
+    docHint: { color: c.textDim, fontSize: 11, marginTop: 8 },
+    textarea: { backgroundColor: c.card, borderWidth: 1, borderColor: c.border2, borderRadius: 14, padding: 14, color: c.text, fontSize: 14, minHeight: 160, lineHeight: 22 },
     charCount: { color: c.textDim, fontSize: 11, textAlign: 'right', marginTop: 6 },
-    tipCard: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: '#F57F1710', borderWidth: 1, borderColor: '#F57F1725', borderRadius: 12, padding: 12, marginTop: 16 },
+    tipCard: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: '#F57F1710', borderWidth: 1, borderColor: '#F57F1725', borderRadius: 12, padding: 12, marginTop: 14 },
     tipText: { color: '#F57F17', fontSize: 13, lineHeight: 19, flex: 1 },
-    reviewRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14 },
-    reviewLabel: { color: c.textMuted, fontSize: 13 },
-    reviewValue: { color: c.textSub, fontSize: 14, fontWeight: '600' },
-    reviewCard: { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 12, padding: 16, gap: 10 },
-    reviewCardLabel: { color: c.textMuted, fontSize: 12, fontWeight: '600' },
-    reviewDocRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border2, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
+    currencyLabel: { color: c.textMuted, fontSize: 14, fontWeight: '700' },
+    input: { color: c.text, fontSize: 15 },
+    creditCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.accentBg, borderWidth: 1, borderColor: c.accentBorder, borderRadius: 12, padding: 14 },
+    creditCardWarn: { backgroundColor: '#FFF3E0', borderColor: '#E6510044' },
+    creditCost: { color: c.accent, fontSize: 13, fontWeight: '700' },
+    creditBalance: { color: c.textMuted, fontSize: 12, marginTop: 2 },
+    reviewCard: { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: 14, gap: 0, overflow: 'hidden' },
+    reviewRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, gap: 16 },
+    reviewLabel: { color: c.textMuted, fontSize: 13, flexShrink: 0 },
+    reviewValue: { color: c.textSub, fontSize: 14, fontWeight: '600', flex: 1, textAlign: 'right' },
+    reviewCardLabel: { color: c.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+    reviewDocRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
     reviewDocName: { color: c.textSub, fontSize: 14, fontWeight: '600', flex: 1 },
-    reviewDocSize: { color: c.textMuted, fontSize: 12 },
     reviewCoverText: { color: c.textBody, fontSize: 13, lineHeight: 20 },
     reviewCoverEmpty: { color: c.textDim, fontSize: 13, fontStyle: 'italic' },
     noticeCard: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: '#e3f2fd', borderWidth: 1, borderColor: '#90caf9', borderRadius: 12, padding: 12 },
     noticeText: { color: '#1565c0', fontSize: 13, lineHeight: 19 },
     noticeLink: { color: '#1e88e5', fontSize: 13, fontWeight: '700' },
-    consentRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+    consentRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingBottom: 8 },
     consentText: { color: c.textMuted, fontSize: 12, lineHeight: 18, flex: 1 },
     cta: { paddingHorizontal: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.bg },
     nextBtn: { height: 52, borderRadius: 14, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
     btnDisabled: { opacity: 0.4 },
     nextBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-    successWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 },
+    centerWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 },
     successCircle: { width: 96, height: 96, borderRadius: 48, backgroundColor: c.accentBg, borderWidth: 2, borderColor: c.accentBorder, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
     successTitle: { color: c.text, fontSize: 24, fontWeight: '800' },
     successMsg: { color: c.textBody, fontSize: 14, textAlign: 'center', lineHeight: 22 },

@@ -1,10 +1,12 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { useTheme } from '@/hooks/useTheme';
+import { api } from '@/lib/api';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ProfileEditScreen() {
@@ -31,6 +33,8 @@ export default function ProfileEditScreen() {
   const [levelInput, setLevelInput] = useState('');
   const [languages, setLanguages] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!data || hydrated) return;
@@ -45,6 +49,7 @@ export default function ProfileEditScreen() {
     setOpenToWork(data.profile?.openToWork ?? false);
     setSkills(data.profile?.skills ?? []);
     setLanguages(data.profile?.languages ?? []);
+    setAvatarUrl(data.avatar ?? data.profile_image ?? null);
     setHydrated(true);
   }, [data, hydrated]);
 
@@ -67,6 +72,31 @@ export default function ProfileEditScreen() {
   };
   const removeLang = (s: string) => setLanguages((prev) => prev.filter((x) => x !== s));
   const parseLang = (s: string) => { const [l, lv] = s.split(':'); return { lang: l ?? s, level: lv ?? '' }; };
+
+  const handleChangePhoto = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['image/jpeg', 'image/png', 'image/webp'],
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const file = result.assets[0];
+    const formData = new FormData();
+    formData.append('file', { uri: file.uri, name: file.name, type: file.mimeType ?? 'image/jpeg' } as any);
+    formData.append('documentType', 'OTHER');
+    formData.append('name', 'avatar');
+    setUploadingPhoto(true);
+    try {
+      const { data } = await api.post('/documents/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setAvatarUrl(data.url);
+      updateProfile({ avatar: data.url });
+    } catch {
+      Alert.alert('Upload failed', 'Could not upload photo. Please try again.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const onSave = () => {
     if (!name.trim()) {
@@ -123,8 +153,19 @@ export default function ProfileEditScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
           {/* Avatar */}
           <View style={styles.avatarSection}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
-            <TouchableOpacity><Text style={styles.changePhotoText}>Change photo</Text></TouchableOpacity>
+            <View style={styles.avatar}>
+              {avatarUrl
+                ? <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                : <Text style={styles.avatarText}>{initial}</Text>}
+            </View>
+            <TouchableOpacity onPress={handleChangePhoto} disabled={uploadingPhoto} style={styles.changePhotoBtn}>
+              {uploadingPhoto
+                ? <ActivityIndicator color={c.accent} size="small" />
+                : <>
+                    <Ionicons name="camera-outline" size={16} color={c.accent} />
+                    <Text style={styles.changePhotoText}>Change photo</Text>
+                  </>}
+            </TouchableOpacity>
           </View>
 
           {/* Basic info */}
@@ -278,8 +319,9 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     saveBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
     scroll: { paddingHorizontal: 16, paddingTop: 8 },
     avatarSection: { alignItems: 'center', marginBottom: 24, gap: 10 },
-    avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' },
-    avatarText: { color: '#fff', fontSize: 34, fontWeight: '800' },
+    avatar: { width: 90, height: 90, borderRadius: 45, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 2, borderColor: c.accentBorder },
+    avatarText: { color: '#fff', fontSize: 36, fontWeight: '800' },
+    changePhotoBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: c.accentBorder, backgroundColor: c.accentBg },
     changePhotoText: { color: c.accent, fontSize: 14, fontWeight: '600' },
     card: { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 16, padding: 16, marginBottom: 16 },
     cardTitle: { color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 14 },

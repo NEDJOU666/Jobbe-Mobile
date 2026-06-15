@@ -205,7 +205,7 @@ export default function ApplicationsScreen() {
               <TouchableOpacity
                 style={styles.card}
                 activeOpacity={0.88}
-                onPress={() => router.push(`/job/${item.post.id}`)}
+                onPress={() => router.push(`/application/${item.id}`)}
               >
                 <View style={styles.cardTop}>
                   <View style={styles.firmIcon}>
@@ -244,16 +244,36 @@ export default function ApplicationsScreen() {
                     <Ionicons name={meta.icon as any} size={13} color={meta.color} />
                     <Text style={[styles.statusText, { color: meta.color }]}>{meta.label}</Text>
                   </View>
-                  {WITHDRAWABLE.includes(cur) && (
-                    <TouchableOpacity
-                      style={styles.withdrawBtn}
-                      onPress={() => confirmWithdraw(item)}
-                      disabled={isWithdrawing}
-                    >
-                      <Ionicons name="trash-outline" size={14} color="#C62828" />
-                      <Text style={styles.withdrawText}>Withdraw</Text>
-                    </TouchableOpacity>
-                  )}
+                  <View style={styles.cardActions}>
+                    {!item.post.source && (
+                      <TouchableOpacity
+                        style={styles.msgBtn}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          router.push({
+                            pathname: '/(tabs)/messages',
+                            params: { applicationId: item.id, firmName: item.firm?.name ?? '', postTitle: item.post.title },
+                          });
+                        }}
+                      >
+                        <Ionicons name="chatbubble-outline" size={13} color={c.accent} />
+                        <Text style={styles.msgBtnText}>Message</Text>
+                      </TouchableOpacity>
+                    )}
+                    {WITHDRAWABLE.includes(cur) && (
+                      <TouchableOpacity
+                        style={styles.withdrawBtn}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          confirmWithdraw(item);
+                        }}
+                        disabled={isWithdrawing}
+                      >
+                        <Ionicons name="trash-outline" size={14} color="#C62828" />
+                        <Text style={styles.withdrawText}>Withdraw</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               </TouchableOpacity>
             );
@@ -291,6 +311,9 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     cardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
     statusText: { fontSize: 12, fontWeight: '600' },
+    cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    msgBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: c.accentBorder, backgroundColor: c.accentBg },
+    msgBtnText: { fontSize: 12, fontWeight: '600', color: c.accent },
     withdrawBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: '#C6282833' },
     withdrawText: { fontSize: 12, fontWeight: '600', color: '#C62828' },
     empty: { alignItems: 'center', paddingTop: 100, gap: 10 },

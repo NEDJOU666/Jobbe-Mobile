@@ -1,11 +1,14 @@
 import { useAuth } from '@/hooks/useAuth';
+import { useDocuments } from '@/hooks/useDocuments';
 import { useProfile } from '@/hooks/useProfile';
+import { useStats } from '@/hooks/useStats';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 
 function parseLang(s: string): { lang: string; level: string } {
   const [lang, level] = s.split(':');
@@ -32,16 +35,32 @@ function computeCompletion(p: { headline?: string | null; bio?: string | null; l
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const { colors: c } = useTheme();
+  const { user, logout } = useAuth();
+  const { colors: c, isDark, toggle } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const qc = useQueryClient();
 
   const { data, isLoading, isError, refetch } = useProfile();
+  const { data: stats } = useStats();
+  const { data: docs } = useDocuments();
   const profile = data?.profile ?? null;
 
   const displayName = data?.name ?? user?.name ?? 'User';
   const displayEmail = data?.email ?? user?.email ?? '—';
+  const avatarUri = (data as any)?.profile_image ?? (data as any)?.avatar ?? null;
   const initial = displayName.charAt(0).toUpperCase();
+
+  const resumes = docs?.filter((d) => d.documentType === 'RESUME') ?? [];
+
+  const handleLogout = () => {
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out', style: 'destructive',
+        onPress: async () => { await logout(); qc.clear(); },
+      },
+    ]);
+  };
 
   const skills = profile?.skills ?? [];
   const languages = profile?.languages ?? [];
@@ -76,7 +95,11 @@ export default function ProfileScreen() {
           {/* Hero */}
           <View style={styles.hero}>
             <View style={styles.avatarWrap}>
-              <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
+              <View style={styles.avatar}>
+                {avatarUri
+                  ? <Image source={{ uri: avatarUri }} style={{ width: 84, height: 84, borderRadius: 42 }} />
+                  : <Text style={styles.avatarText}>{initial}</Text>}
+              </View>
               {data?.isEmailVerified && (
                 <View style={styles.verifiedBadge}><Ionicons name="checkmark-circle" size={22} color={c.accent} /></View>
               )}
@@ -168,6 +191,96 @@ export default function ProfileScreen() {
             </Section>
           )}
 
+          {/* Stats */}
+          <Section c={c} title="My Stats">
+            <View style={styles.statsRow}>
+              {[
+                { label: 'Applied',    value: stats?.applied    ?? 0, icon: 'document-text-outline', color: '#1565C0' },
+                { label: 'Interviews', value: stats?.interviews ?? 0, icon: 'videocam-outline',       color: '#6A1B9A' },
+                { label: 'Offers',     value: stats?.offers     ?? 0, icon: 'trophy-outline',         color: c.accent },
+              ].map((s) => (
+                <View key={s.label} style={styles.statCard}>
+                  <View style={[styles.statIcon, { backgroundColor: s.color + '18' }]}>
+                    <Ionicons name={s.icon as any} size={18} color={s.color} />
+                  </View>
+                  <Text style={styles.statValue}>{s.value}</Text>
+                  <Text style={styles.statLabel}>{s.label}</Text>
+                </View>
+              ))}
+            </View>
+          </Section>
+
+          {/* Documents */}
+          <Section c={c} title="Résumés & Documents">
+            {resumes.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingVertical: 12, gap: 6 }}>
+                <Ionicons name="document-outline" size={32} color={c.border3} />
+                <Text style={{ color: c.textMuted, fontSize: 13 }}>No résumé uploaded</Text>
+                <TouchableOpacity
+                  style={[styles.outlineBtn, { marginTop: 4 }]}
+                  onPress={() => router.push('/documents')}
+                >
+                  <Ionicons name="add-circle-outline" size={16} color={c.accent} />
+                  <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600' }}>Upload résumé</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                {resumes.map((doc) => (
+                  <View key={doc.id} style={styles.docRow}>
+                    <View style={styles.docIcon}>
+                      <Ionicons name="document-text-outline" size={20} color={c.accent} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
+                      {doc.size && <Text style={{ color: c.textMuted, fontSize: 11 }}>{doc.size}</Text>}
+                    </View>
+                    {doc.isDefault && (
+                      <View style={styles.defaultBadge}>
+                        <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700' }}>Default</Text>
+                      </View>
+                    )}
+                  </View>
+                ))}
+                <TouchableOpacity
+                  style={[styles.outlineBtn, { marginTop: 10 }]}
+                  onPress={() => router.push('/documents')}
+                >
+                  <Ionicons name="folder-open-outline" size={16} color={c.accent} />
+                  <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600' }}>Manage documents</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </Section>
+
+          {/* App Settings */}
+          <Section c={c} title="App Settings">
+            <View style={styles.settingRow}>
+              <View style={styles.settingLeft}>
+                <View style={[styles.settingIcon, { backgroundColor: '#33333318' }]}>
+                  <Ionicons name={isDark ? 'moon' : 'sunny-outline'} size={18} color={c.icon} />
+                </View>
+                <Text style={styles.settingLabel}>Dark Mode</Text>
+              </View>
+              <Switch
+                value={isDark}
+                onValueChange={toggle}
+                trackColor={{ false: c.border2, true: c.accent + '88' }}
+                thumbColor={isDark ? c.accent : c.textMuted}
+              />
+            </View>
+
+            <TouchableOpacity style={[styles.settingRow, { borderBottomWidth: 0 }]} onPress={handleLogout} activeOpacity={0.7}>
+              <View style={styles.settingLeft}>
+                <View style={[styles.settingIcon, { backgroundColor: '#C6282818' }]}>
+                  <Ionicons name="log-out-outline" size={18} color="#C62828" />
+                </View>
+                <Text style={[styles.settingLabel, { color: '#C62828' }]}>Sign Out</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+            </TouchableOpacity>
+          </Section>
+
           <View style={{ height: 32 }} />
         </ScrollView>
       )}
@@ -235,5 +348,22 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     emptyText: { color: c.textMuted, fontSize: 16, fontWeight: '600' },
     retryBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10, backgroundColor: c.accentBg, borderWidth: 1, borderColor: c.accentBorder },
     retryText: { color: c.accent, fontWeight: '600' },
+
+    statsRow: { flexDirection: 'row', gap: 10 },
+    statCard: { flex: 1, backgroundColor: c.card2, borderRadius: 12, padding: 12, alignItems: 'center', gap: 5, borderWidth: 1, borderColor: c.border },
+    statIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    statValue: { color: c.text, fontSize: 20, fontWeight: '800' },
+    statLabel: { color: c.textMuted, fontSize: 11, fontWeight: '600' },
+
+    docRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border },
+    docIcon: { width: 40, height: 40, borderRadius: 10, borderWidth: 1, borderColor: c.accentBorder, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    docName: { color: c.text, fontSize: 14, fontWeight: '600' },
+    defaultBadge: { backgroundColor: c.accentBg, borderRadius: 20, borderWidth: 1, borderColor: c.accentBorder, paddingHorizontal: 8, paddingVertical: 3 },
+    outlineBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', borderWidth: 1, borderColor: c.accentBorder, borderRadius: 10, paddingVertical: 10 },
+
+    settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.border },
+    settingLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    settingIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    settingLabel: { color: c.text, fontSize: 15, fontWeight: '600' },
   });
 }

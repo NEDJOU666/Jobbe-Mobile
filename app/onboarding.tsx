@@ -1,11 +1,11 @@
-import { api } from '@/lib/api';
+import { api, API_URL } from '@/lib/api';
 import { secureStorage } from '@/utils/secureStorage';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Alert, BackHandler, KeyboardAvoidingView, Platform,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -72,7 +72,7 @@ export default function OnboardingScreen() {
       form.append('file', { uri: cvUri, name: cvName, type: cvMime ?? 'application/pdf' } as any);
       form.append('documentType', 'RESUME');
       form.append('name', cvName.replace(/\.[^/.]+$/, ''));
-      await fetch(`${process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000/api'}/documents/upload`, {
+      await fetch(`${API_URL}/documents/upload`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: form,
@@ -121,6 +121,15 @@ export default function OnboardingScreen() {
   };
 
   const currentStep = STEPS[step];
+
+  // Hardware back: go to previous step; block exit on step 0 to keep user in flow
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (step > 0) { setStep((s) => s - 1); return true; }
+      return true; // block hardware back on first step — user must skip or finish
+    });
+    return () => sub.remove();
+  }, [step]);
 
   return (
     <SafeAreaView style={styles.safe}>

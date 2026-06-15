@@ -1,15 +1,39 @@
 import {
   StyleSheet, View, Text, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ScrollView, Alert,
+  KeyboardAvoidingView, Platform, ScrollView, Alert, Modal, FlatList, Linking,
 } from 'react-native';
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@/hooks/useAuth';
 
+const COUNTRIES = [
+  'Cameroon', 'Nigeria', 'Ghana', 'Kenya', 'South Africa', 'Ethiopia', 'Tanzania',
+  'Uganda', 'Rwanda', 'Senegal', "Côte d'Ivoire", 'Benin', 'Togo', 'Mali',
+  'Burkina Faso', 'Niger', 'Chad', 'Central African Republic', 'Gabon', 'Congo',
+  'DR Congo', 'Angola', 'Mozambique', 'Zimbabwe', 'Zambia', 'Malawi', 'Madagascar',
+  'Morocco', 'Tunisia', 'Algeria', 'Egypt', 'France', 'United Kingdom', 'United States',
+  'Canada', 'Germany', 'Belgium', 'Switzerland', 'Other',
+];
+
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3004/api';
+
+function GoogleLogo() {
+  return (
+    <View style={{ width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, overflow: 'hidden' }}>
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 11, backgroundColor: '#4285F4' }} />
+        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 11, backgroundColor: '#34A853' }} />
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 11, backgroundColor: '#EA4335' }} />
+        <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 11, backgroundColor: '#FBBC05' }} />
+        <View style={{ position: 'absolute', top: 3, left: 3, right: 3, bottom: 3, borderRadius: 8, backgroundColor: '#fff' }} />
+      </View>
+      <Text style={{ fontSize: 13, fontWeight: '800', color: '#4285F4', zIndex: 1 }}>G</Text>
+    </View>
+  );
+}
 
 export default function SignUpScreen() {
   const { signup, sendVerificationOtp, isLoading, error } = useAuth();
@@ -21,6 +45,8 @@ export default function SignUpScreen() {
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [receiveEmails, setReceiveEmails] = useState(true);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [country, setCountry] = useState('Cameroon');
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
 
   const handleSignup = async () => {
     if (!firstName || !lastName || !email || !password) {
@@ -53,12 +79,13 @@ export default function SignUpScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        style={{ backgroundColor: '#0D0D0D' }}
       >
         {/* Back */}
         <Animated.View entering={FadeInDown.delay(0).duration(400)}>
@@ -87,7 +114,7 @@ export default function SignUpScreen() {
               'jobfinder://auth/callback',
             )}
           >
-            <Text style={styles.googleG}>G</Text>
+            <GoogleLogo />
             <Text style={styles.googleBtnText}>Continue with Google</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -171,8 +198,12 @@ export default function SignUpScreen() {
         {/* Country */}
         <Animated.View entering={FadeInDown.delay(420).duration(500)}>
           <Text style={styles.fieldLabel}>Country</Text>
-          <TouchableOpacity style={styles.countryPicker} activeOpacity={0.8}>
-            <Text style={styles.countryText}>Cameroon</Text>
+          <TouchableOpacity
+            style={styles.countryPicker}
+            activeOpacity={0.8}
+            onPress={() => setShowCountryPicker(true)}
+          >
+            <Text style={styles.countryText}>{country}</Text>
             <Ionicons name="chevron-down" size={18} color="#888" />
           </TouchableOpacity>
         </Animated.View>
@@ -204,9 +235,9 @@ export default function SignUpScreen() {
             </View>
             <Text style={styles.checkboxLabel}>
               Yes, I understand and agree to the{' '}
-              <Text style={styles.link}>Terms of Service</Text>, including the{' '}
-              <Text style={styles.link}>User Agreement</Text> and{' '}
-              <Text style={styles.link}>Privacy Policy</Text>.
+              <Text style={styles.link} onPress={() => Linking.openURL('https://jobfinder.oxbiy.com/terms')}>Terms of Service</Text>, including the{' '}
+              <Text style={styles.link} onPress={() => Linking.openURL('https://jobfinder.oxbiy.com/terms')}>User Agreement</Text> and{' '}
+              <Text style={styles.link} onPress={() => Linking.openURL('https://jobfinder.oxbiy.com/about/privacy')}>Privacy Policy</Text>.
             </Text>
           </TouchableOpacity>
         </Animated.View>
@@ -233,6 +264,34 @@ export default function SignUpScreen() {
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
+
+      {/* Country picker modal */}
+      <Modal visible={showCountryPicker} transparent animationType="slide" onRequestClose={() => setShowCountryPicker(false)}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowCountryPicker(false)} />
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHandle} />
+            <Text style={styles.pickerTitle}>Select Country</Text>
+            <FlatList
+              data={COUNTRIES}
+              keyExtractor={(item) => item}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.pickerItem, item === country && styles.pickerItemSelected]}
+                  onPress={() => { setCountry(item); setShowCountryPicker(false); }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.pickerItemText, item === country && styles.pickerItemTextSelected]}>
+                    {item}
+                  </Text>
+                  {item === country && <Ionicons name="checkmark" size={18} color="#14A800" />}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -258,11 +317,12 @@ const styles = StyleSheet.create({
 
   googleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#1a73e8', borderRadius: 10,
-    height: 54, marginBottom: 20, gap: 10,
+    backgroundColor: '#fff', borderRadius: 12,
+    borderWidth: 1.5, borderColor: '#dadce0',
+    height: 54, marginBottom: 20, gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 3, elevation: 2,
   },
-  googleG: { fontSize: 18, fontWeight: '800', color: '#fff' },
-  googleBtnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  googleBtnText: { fontSize: 15, fontWeight: '600', color: '#3c4043' },
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#E8E8E8' },
@@ -314,4 +374,23 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
   footerText: { color: '#888', fontSize: 14 },
   footerLink: { color: '#14A800', fontSize: 14, fontWeight: '700' },
+
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  pickerSheet: {
+    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 16, paddingBottom: 40, maxHeight: '70%',
+  },
+  pickerHandle: {
+    width: 40, height: 4, borderRadius: 2, backgroundColor: '#DDD',
+    alignSelf: 'center', marginTop: 12, marginBottom: 16,
+  },
+  pickerTitle: { fontSize: 16, fontWeight: '700', color: '#111', textAlign: 'center', marginBottom: 12 },
+  pickerItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 14, paddingHorizontal: 8,
+    borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+  },
+  pickerItemSelected: { backgroundColor: '#14A80008' },
+  pickerItemText: { fontSize: 15, color: '#333' },
+  pickerItemTextSelected: { color: '#14A800', fontWeight: '700' },
 });

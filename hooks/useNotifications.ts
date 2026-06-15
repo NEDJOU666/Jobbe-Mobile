@@ -8,13 +8,16 @@ export type NotificationType =
   | 'FIRM_VERIFIED' | 'FIRM_REJECTED' | 'CREDIT_PURCHASED'
   | 'INVITATION_RECEIVED' | 'INVITATION_RESPONSE' | 'GENERAL'
 
+export type NotificationContext = 'FIRM' | 'WORKSPACE'
+
 export interface Notification {
   id: string; user_id: string; type: NotificationType
+  context: NotificationContext | null
   title: string; message: string; isRead: boolean
   link: string | null; createdAt: string
 }
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000/api';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3004/api';
 
 export function useNotifications() {
   return useQuery<{ notifications: Notification[]; unreadCount: number }>({
@@ -102,7 +105,10 @@ export function useMarkRead() {
 export function useMarkAllRead() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () => api.post('/notifications/read-all').then((r) => r.data),
+    mutationFn: (context?: NotificationContext) =>
+      api.patch('/notifications/read-all', null, {
+        params: context ? { context } : undefined,
+      }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   })
 }

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef } from 'react';
-import { Animated, Dimensions, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
@@ -48,6 +48,7 @@ export function DrawerMenu({ visible, onClose }: Props) {
   };
 
   const initial = user?.name?.charAt(0).toUpperCase() ?? '?';
+  const avatarUri = (user as any)?.profile_image ?? (user as any)?.avatar ?? null;
 
   return (
     <>
@@ -58,12 +59,16 @@ export function DrawerMenu({ visible, onClose }: Props) {
       <Animated.View style={[styles.drawer, { transform: [{ translateX }], paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
         {/* User header */}
         <View style={styles.userRow}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
+          <View style={styles.avatar}>
+            {avatarUri
+              ? <Image source={{ uri: avatarUri }} style={StyleSheet.absoluteFill} />
+              : <Text style={styles.avatarText}>{initial}</Text>}
+          </View>
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{user?.name ?? 'User'}</Text>
             <Text style={styles.userRole}>Job Seeker</Text>
           </View>
-          <Ionicons name="checkmark-circle" size={20} color={c.accent} />
+          {user?.isEmailVerified && <Ionicons name="checkmark-circle" size={20} color={c.accent} />}
         </View>
 
         <View style={styles.divider} />
@@ -96,7 +101,7 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 10 },
     drawer: { position: 'absolute', top: 0, left: 0, bottom: 0, width: DRAWER_WIDTH, backgroundColor: c.card, borderRightWidth: 1, borderRightColor: c.border, zIndex: 11, paddingHorizontal: 24 },
     userRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
-    avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' },
+    avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
     avatarText: { color: '#fff', fontSize: 22, fontWeight: '700' },
     userInfo: { flex: 1 },
     userName: { color: c.text, fontSize: 16, fontWeight: '700' },

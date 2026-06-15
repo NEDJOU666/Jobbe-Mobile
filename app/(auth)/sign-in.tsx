@@ -11,7 +11,25 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@/hooks/useAuth';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3004/api';
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3004/api';
+
+function GoogleLogo() {
+  return (
+    <View style={{ width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Outer ring segments */}
+      <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, overflow: 'hidden' }}>
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 11, backgroundColor: '#4285F4' }} />
+        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 11, backgroundColor: '#34A853' }} />
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 11, backgroundColor: '#EA4335' }} />
+        <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 11, backgroundColor: '#FBBC05' }} />
+        {/* Inner white circle */}
+        <View style={{ position: 'absolute', top: 3, left: 3, right: 3, bottom: 3, borderRadius: 8, backgroundColor: '#fff' }} />
+      </View>
+      {/* G letter */}
+      <Text style={{ fontSize: 13, fontWeight: '800', color: '#4285F4', zIndex: 1 }}>G</Text>
+    </View>
+  );
+}
 
 export default function SignInScreen() {
   const { login, isLoading, error, clearError } = useAuth();
@@ -27,31 +45,23 @@ export default function SignInScreen() {
     }
     try {
       await login(email, password);
-      const { secureStorage } = await import('@/utils/secureStorage');
-      const token = await secureStorage.getAccessToken();
-      if (token) {
-        const res = await fetch(`${API_BASE}/profile`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
-        const data = res?.ok ? await res.json() : null;
-        if (data?.role !== 'EMPLOYER' && !data?.profile?.profileCompleted) {
-          router.replace('/onboarding' as any);
-          return;
-        }
-      }
       router.replace('/(tabs)');
     } catch (err: any) {
-      Alert.alert('Login Failed', error || 'Please check your credentials');
+      const msg = (err as any)?.response?.data?.message || err?.message || 'Please check your credentials';
+      Alert.alert('Login Failed', msg);
     }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        style={{ backgroundColor: '#0D0D0D' }}
       >
         {/* Back button */}
         <Animated.View entering={FadeInDown.delay(0).duration(400)}>
@@ -151,37 +161,21 @@ export default function SignInScreen() {
         {/* Google */}
         <Animated.View entering={FadeInDown.delay(440).duration(500)}>
           <TouchableOpacity
-            style={styles.socialBtn}
+            style={styles.googleBtn}
             activeOpacity={0.85}
             disabled={isLoading}
             onPress={() => WebBrowser.openAuthSessionAsync(
-              `${API_BASE}/auth/google?source=mobile`,
+              `${API_URL}/auth/google?source=mobile`,
               'jobfinder://auth/callback',
             )}
           >
-            <Text style={styles.googleG}>G</Text>
-            <Text style={styles.socialBtnText}>Continue with Google</Text>
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* GitHub */}
-        <Animated.View entering={FadeInDown.delay(510).duration(500)}>
-          <TouchableOpacity
-            style={styles.socialBtn}
-            activeOpacity={0.85}
-            disabled={isLoading}
-            onPress={() => WebBrowser.openAuthSessionAsync(
-              `${API_BASE}/auth/github?source=mobile`,
-              'jobfinder://auth/callback',
-            )}
-          >
-            <Ionicons name="logo-github" size={20} color="#000" />
-            <Text style={styles.socialBtnText}>Continue with GitHub</Text>
+            <GoogleLogo />
+            <Text style={styles.googleBtnText}>Continue with Google</Text>
           </TouchableOpacity>
         </Animated.View>
 
         {/* Footer */}
-        <Animated.View entering={FadeInDown.delay(580).duration(500)} style={styles.footer}>
+        <Animated.View entering={FadeInDown.delay(510).duration(500)} style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account? </Text>
           <TouchableOpacity onPress={() => router.replace('/(auth)/sign-up')} disabled={isLoading}>
             <Text style={styles.footerLink}>Sign Up</Text>
@@ -239,13 +233,14 @@ const styles = StyleSheet.create({
   dividerLine: { flex: 1, height: 1, backgroundColor: '#2A2A2A' },
   dividerText: { color: '#555', marginHorizontal: 14, fontSize: 12, fontWeight: '600' },
 
-  socialBtn: {
+  googleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#fff', borderRadius: 10,
-    height: 54, marginBottom: 12, gap: 10,
+    backgroundColor: '#fff', borderRadius: 12,
+    borderWidth: 1, borderColor: '#dadce0',
+    height: 54, gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2,
   },
-  googleG: { fontSize: 18, fontWeight: '800', color: '#4285F4' },
-  socialBtnText: { fontSize: 15, fontWeight: '600', color: '#000' },
+  googleBtnText: { fontSize: 15, fontWeight: '600', color: '#3c4043' },
 
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 36 },
   footerText: { color: '#9BA1A6', fontSize: 14 },

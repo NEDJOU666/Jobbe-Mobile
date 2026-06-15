@@ -3,7 +3,7 @@ import { api } from '@/lib/api'
 
 export interface CreditTransaction {
   id: string; user_id: string; amount: number
-  type: 'PURCHASE' | 'SPEND' | 'REFUND' | 'BONUS'
+  type: 'PURCHASE' | 'SPEND' | 'REFUND' | 'BONUS' | 'ADJUSTMENT'
   referenceId: string | null; description: string | null; createdAt: string
 }
 

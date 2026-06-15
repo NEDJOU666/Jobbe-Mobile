@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { authApi } from '@/services/api';
+import { secureStorage } from '@/utils/secureStorage';
 
 interface AuthUser {
   id: string;
@@ -85,8 +86,10 @@ export const useAuthStore = create<AuthStore>((set) => ({
     set({ isLoading: true, error: null });
     try {
       await authApi.verifyEmail(otp);
-      const user = await authApi.getStoredUser();
-      set({ user: { ...user, isEmailVerified: true }, isLoading: false });
+      set((state) => ({
+        user: state.user ? { ...state.user, isEmailVerified: true } : state.user,
+        isLoading: false,
+      }));
     } catch (err: any) {
       const errorMsg = err.response?.data?.message || 'Verification failed';
       set({ error: errorMsg, isLoading: false });
@@ -121,7 +124,18 @@ export const useAuthStore = create<AuthStore>((set) => ({
   hydrate: async () => {
     set({ isLoading: true });
     try {
-      const user = await authApi.getStoredUser();
+      let user = await authApi.getStoredUser();
+      if (!user) {
+        // Fallback for OAuth: token saved but user object never persisted
+        const token = await secureStorage.getAccessToken();
+        if (token) {
+          const fresh = await authApi.getMe().catch(() => null);
+          if (fresh) {
+            await secureStorage.setUser(fresh);
+            user = fresh;
+          }
+        }
+      }
       if (user) {
         set({ user, isLoggedIn: true, isLoading: false });
       } else {

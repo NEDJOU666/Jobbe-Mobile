@@ -2,7 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 
 export interface UserProfileData {
-  id: string; name: string; email: string; phone: string | null; avatar: string | null
+  id: string; name: string; email: string; phone: string | null;
+  avatar: string | null; profile_image: string | null
   role: string; isEmailVerified: boolean; createdAt: string
   profile: {
     headline: string | null; bio: string | null; location: string | null
@@ -29,6 +30,7 @@ export function useUpdateProfile() {
       phone: string; website: string; linkedin: string; github: string
       skills: string[]; languages: string[]; experience: any; education: any
       openToWork: boolean; profileVisible: boolean; showSalary: boolean
+      avatar: string;
     }>) => api.patch('/profile', data).then((r) => r.data),
     onSuccess: (data) => {
       qc.setQueryData(['profile'], data)

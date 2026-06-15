@@ -1,5 +1,5 @@
 import { JobCard, type Job } from '@/components/JobCard';
-import { useSaved, useToggleSave } from '@/hooks/useSaved';
+import { useSaved, useToggleSave, type SavedItem } from '@/hooks/useSaved';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -41,10 +41,10 @@ export default function SavedScreen() {
           refreshControl={
             <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={c.accent} />
           }
-          renderItem={({ item }) => (
+          renderItem={({ item }: { item: SavedItem }) => (
             <JobCard
-              job={{ ...item, isSaved: true } as Job}
-              onPress={() => router.push(`/job/${item.id}`)}
+              job={{ ...item.post, isSaved: true } as Job}
+              onPress={() => router.push(`/job/${item.post.id}`)}
               onSave={(id, nextSaved) => { if (!nextSaved) toggleSave(id); }}
             />
           )}

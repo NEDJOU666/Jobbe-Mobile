@@ -13,6 +13,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "android": { "buildType": "apk" },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.jobfinder.oxbiy.com/api"
@@ -20,6 +21,8 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
+      "android": { "buildType": "apk" },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.jobfinder.oxbiy.com/api"
       }

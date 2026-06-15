@@ -1,57 +1,104 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Job } from '@/hooks/useJobs';
 import {
-  ActivityIndicator, FlatList, RefreshControl, StyleSheet,
+  ActivityIndicator, FlatList, Image, RefreshControl, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
-import { useJobs } from '@/hooks/useJobs';
+import { useJobsFeed } from '@/hooks/useJobs';
 import { JobCard } from '@/components/JobCard';
 import { DrawerMenu } from '@/components/DrawerMenu';
 
-type SortMode = 'recent' | 'popular';
+type SortMode = 'all' | 'recent' | 'popular';
+
+const TABS: { mode: SortMode; label: string }[] = [
+  { mode: 'all',     label: 'All' },
+  { mode: 'recent',  label: 'Most Recent' },
+  { mode: 'popular', label: 'Most Applied' },
+];
 
 export default function JobsScreen() {
   const { user } = useAuth();
   const { colors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [sortMode, setSortMode] = useState<SortMode>('recent');
+  const [sortMode, setSortMode] = useState<SortMode>('all');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const { data, isLoading, isError, refetch, isRefetching } = useJobs(
-    debouncedSearch ? { search: debouncedSearch } : undefined,
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
+
+  const feedParams = useMemo(
+    () => (debouncedSearch ? { search: debouncedSearch } : undefined),
+    [debouncedSearch],
   );
 
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useJobsFeed(feedParams);
+
+  const avatarUri = (user as any)?.profile_image ?? (user as any)?.avatar ?? null;
   const initial = user?.name?.charAt(0).toUpperCase() ?? '?';
 
-  const jobs = useMemo(() => {
-    const list = data?.data ?? [];
-    if (sortMode === 'popular') {
-      return [...list].sort((a, b) => (b._count?.applications ?? 0) - (a._count?.applications ?? 0));
-    }
-    return list;
-  }, [data, sortMode]);
+  // Flatten all loaded pages into a single array then apply client-side sort
+  const allJobs = useMemo(
+    () => data?.pages.flatMap((p) => p.data) ?? [],
+    [data],
+  );
 
-  const handleSearch = (text: string) => {
+  const jobs = useMemo(() => {
+    if (sortMode === 'recent') {
+      return [...allJobs].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    }
+    if (sortMode === 'popular') {
+      return [...allJobs]
+        .filter((j) => (j._count?.applications ?? 0) > 0)
+        .sort((a, b) => (b._count?.applications ?? 0) - (a._count?.applications ?? 0));
+    }
+    return allJobs;
+  }, [allJobs, sortMode]);
+
+  const total = data?.pages[0]?.total ?? 0;
+
+  const handleSearch = useCallback((text: string) => {
     setSearch(text);
-    clearTimeout((handleSearch as any)._t);
-    (handleSearch as any)._t = setTimeout(() => setDebouncedSearch(text), 400);
-  };
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(text), 400);
+  }, []);
+
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const renderItem = useCallback(({ item }: { item: Job }) => (
+    <JobCard job={item} onPress={() => router.push(`/job/${item.id}`)} />
+  ), []);
 
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => setDrawerOpen(true)} style={styles.avatarBtn}>
-          <Text style={styles.avatarText}>{initial}</Text>
+          {avatarUri
+            ? <Image source={{ uri: avatarUri }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+            : <Text style={styles.avatarText}>{initial}</Text>}
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Jobs</Text>
-        <TouchableOpacity style={styles.moreBtn}>
+        <TouchableOpacity style={styles.moreBtn} onPress={() => router.push('/settings')}>
           <Ionicons name="ellipsis-vertical" size={20} color={c.icon} />
         </TouchableOpacity>
       </View>
@@ -81,10 +128,10 @@ export default function JobsScreen() {
 
       {/* Sort tabs */}
       <View style={styles.sortRow}>
-        {(['recent', 'popular'] as SortMode[]).map((mode) => (
+        {TABS.map(({ mode, label }) => (
           <TouchableOpacity key={mode} style={styles.sortTab} onPress={() => setSortMode(mode)} activeOpacity={0.8}>
             <Text style={[styles.sortLabel, sortMode === mode && styles.sortLabelActive]}>
-              {mode === 'recent' ? 'Most Recent' : 'Most Applied'}
+              {label}
             </Text>
             {sortMode === mode && <View style={styles.sortUnderline} />}
           </TouchableOpacity>
@@ -109,16 +156,21 @@ export default function JobsScreen() {
         <FlatList
           data={jobs}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <JobCard job={item} onPress={() => router.push(`/job/${item.id}`)} />
-          )}
+          renderItem={renderItem}
           ListHeaderComponent={
-            data?.total != null ? (
+            jobs.length > 0 ? (
               <Text style={styles.feedHint}>
-                {data.total} job{data.total !== 1 ? 's' : ''} found
+                {sortMode === 'popular'
+                  ? `${jobs.length} job${jobs.length !== 1 ? 's' : ''} with applications`
+                  : `${total} job${total !== 1 ? 's' : ''} found`}
                 {debouncedSearch ? ` for "${debouncedSearch}"` : ''}
               </Text>
             ) : null
+          }
+          ListFooterComponent={
+            isFetchingNextPage
+              ? <ActivityIndicator color={c.accent} style={{ marginVertical: 16 }} />
+              : null
           }
           ListEmptyComponent={
             <View style={styles.center}>
@@ -127,8 +179,10 @@ export default function JobsScreen() {
             </View>
           }
           refreshControl={
-            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={c.accent} />
+            <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={c.accent} />
           }
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.3}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 32, paddingTop: 4 }}
         />
@@ -151,11 +205,11 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: c.input, borderRadius: 26, borderWidth: 1, borderColor: c.border2, paddingHorizontal: 14, height: 46 },
     searchInput: { flex: 1, color: c.text, fontSize: 14 },
     savedBtn: { width: 46, height: 46, borderRadius: 23, borderWidth: 1.5, borderColor: c.accent, alignItems: 'center', justifyContent: 'center', backgroundColor: c.accentBg },
-    sortRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 28, paddingTop: 4 },
-    sortTab: { paddingBottom: 10 },
-    sortLabel: { color: c.textMuted, fontSize: 14, fontWeight: '600' },
+    sortRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 0, paddingTop: 4 },
+    sortTab: { paddingBottom: 10, paddingHorizontal: 14, alignItems: 'center' },
+    sortLabel: { color: c.textMuted, fontSize: 13, fontWeight: '600' },
     sortLabelActive: { color: c.text },
-    sortUnderline: { height: 2.5, backgroundColor: c.accent, borderRadius: 2, marginTop: 6 },
+    sortUnderline: { height: 2.5, backgroundColor: c.accent, borderRadius: 2, marginTop: 6, width: '100%' },
     divider: { height: 1, backgroundColor: c.border, marginBottom: 8 },
     feedHint: { color: c.textDim, fontSize: 12, lineHeight: 18, paddingHorizontal: 16, paddingBottom: 10 },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },

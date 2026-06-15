@@ -1,241 +1,296 @@
-import { useAuth } from '@/hooks/useAuth';
-import { useDocuments } from '@/hooks/useDocuments';
-import { useProfile } from '@/hooks/useProfile';
-import { useStats } from '@/hooks/useStats';
-import { useTheme } from '@/hooks/useTheme';
+'use client';
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
+  ActivityIndicator, BackHandler, FlatList, Image, KeyboardAvoidingView,
+  Platform, ScrollView, StyleSheet, Text, TextInput,
+  TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQueryClient } from '@tanstack/react-query';
+import { useLocalSearchParams } from 'expo-router';
+import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/hooks/useTheme';
+import {
+  useInboxThreads, useThreadMessages, useSendMessage,
+  type InboxThread,
+} from '@/hooks/useInbox';
 
-function calcCompletion(data: ReturnType<typeof useProfile>['data']): number {
-  if (!data) return 0;
-  const p = data.profile;
-  const checks = [
-    !!data.name,
-    !!data.email,
-    !!p?.headline,
-    !!p?.bio,
-    !!p?.location,
-    !!(p?.skills && p.skills.length > 0),
-    !!p?.linkedin,
-  ];
-  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'Yesterday' : `${d}d ago`;
 }
 
-function Initials({ name, size, c }: { name: string; size: number; c: any }) {
-  const letters = name
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
-  return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.accent + '22', borderWidth: 2, borderColor: c.accentBorder, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: c.accent, fontSize: size * 0.36, fontWeight: '800' }}>{letters}</Text>
-    </View>
-  );
+interface ActiveConvo {
+  applicationId: string;
+  firmName: string;
+  firmLogo: string | null;
+  postTitle: string;
 }
 
-export default function ProfileScreen() {
-  const { colors: c, isDark, toggle } = useTheme();
+export default function InboxTab() {
+  const { user } = useAuth();
+  const { colors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
-  const qc = useQueryClient();
+  const [active, setActive] = useState<ActiveConvo | null>(null);
+  const [newMsg, setNewMsg] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
 
-  const { data: profile, isLoading: profileLoading, refetch: refetchProfile, isRefetching: profileRefetching } = useProfile();
-  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useStats();
-  const { data: docs, isLoading: docsLoading, refetch: refetchDocs } = useDocuments();
-  const { logout } = useAuth();
+  const { applicationId: paramAppId, firmName: paramFirm, postTitle: paramPost } =
+    useLocalSearchParams<{ applicationId?: string; firmName?: string; postTitle?: string }>();
 
-  const isRefreshing = profileRefetching;
-  const onRefresh = () => {
-    refetchProfile();
-    refetchStats();
-    refetchDocs();
+  const { data: threads = [], isLoading, refetch, isRefetching } = useInboxThreads();
+  const { data: msgData, isLoading: msgsLoading } = useThreadMessages(active?.applicationId ?? null);
+  const messages = msgData?.messages ?? [];
+  const { mutate: send, isPending: sending } = useSendMessage();
+
+  const totalUnread = threads.reduce((s, t) => s + t.unreadCount, 0);
+
+  // Open a thread from the thread list
+  const openThread = (thread: InboxThread) => {
+    setActive({
+      applicationId: thread.applicationId,
+      firmName: thread.firm.name,
+      firmLogo: thread.firm.logo,
+      postTitle: thread.postTitle,
+    });
   };
 
-  const completion = calcCompletion(profile);
-  const resumes = docs?.filter((d) => d.documentType === 'RESUME') ?? [];
-
-  const handleLogout = () => {
-    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: async () => {
-          await logout();
-          qc.clear();
-        },
-      },
-    ]);
+  // Close thread → go back to thread list
+  const closeThread = () => {
+    setActive(null);
+    setNewMsg('');
   };
 
-  const isLoading = profileLoading && statsLoading && docsLoading;
+  // Hardware back button: close thread if open, otherwise default behavior
+  useEffect(() => {
+    if (!active) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      closeThread();
+      return true;
+    });
+    return () => sub.remove();
+  }, [active]);
 
+  // Auto-open when navigated here from application detail with params
+  useEffect(() => {
+    if (!paramAppId || active || isLoading) return;
+    const match = threads.find((t) => t.applicationId === paramAppId);
+    if (match) {
+      openThread(match);
+    } else if (paramAppId) {
+      // No thread yet — open a new conversation view
+      setActive({
+        applicationId: paramAppId,
+        firmName: paramFirm ?? 'Firm',
+        firmLogo: null,
+        postTitle: paramPost ?? '',
+      });
+    }
+  }, [paramAppId, threads, isLoading]);
+
+  // After first message sent, thread appears in inbox — update header with firm logo
+  useEffect(() => {
+    if (!active) return;
+    const match = threads.find((t) => t.applicationId === active.applicationId);
+    if (match && !active.firmLogo && match.firm.logo) {
+      setActive((a) => a ? { ...a, firmLogo: match.firm.logo } : a);
+    }
+  }, [threads]);
+
+  const handleSend = () => {
+    if (!newMsg.trim() || !active) return;
+    const body = newMsg.trim();
+    setNewMsg('');
+    send({ applicationId: active.applicationId, body }, {
+      onSuccess: () => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150),
+    });
+  };
+
+  /* ── Thread / Conversation view ─────────────────────────────────── */
+  if (active) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          {/* Header */}
+          <View style={styles.threadHeader}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={closeThread}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="arrow-back" size={22} color={c.text} />
+            </TouchableOpacity>
+            <View style={styles.threadFirmAvatar}>
+              {active.firmLogo
+                ? <Image source={{ uri: active.firmLogo }} style={StyleSheet.absoluteFill} />
+                : <Text style={styles.threadFirmInitial}>{active.firmName?.charAt(0)?.toUpperCase() ?? '?'}</Text>}
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.threadFirmName} numberOfLines={1}>{active.firmName}</Text>
+              <Text style={styles.threadPostTitle} numberOfLines={1}>{active.postTitle}</Text>
+            </View>
+          </View>
+
+          {/* Messages */}
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.msgList}
+            showsVerticalScrollIndicator={false}
+            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+          >
+            {msgsLoading ? (
+              <View style={{ alignItems: 'center', paddingTop: 60 }}>
+                <ActivityIndicator color={c.accent} />
+              </View>
+            ) : messages.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingTop: 60, gap: 10 }}>
+                <Ionicons name="chatbubble-outline" size={44} color={c.border3} />
+                <Text style={{ color: c.textMuted, fontSize: 14, fontWeight: '600' }}>No messages yet</Text>
+                <Text style={{ color: c.textDim, fontSize: 12, textAlign: 'center', paddingHorizontal: 32 }}>
+                  Start the conversation with {active.firmName}
+                </Text>
+              </View>
+            ) : (
+              messages.map((msg) => {
+                const isMe = msg.sender.id === user?.id;
+                return (
+                  <View key={msg.id} style={[styles.msgRow, isMe && styles.msgRowMe]}>
+                    <View style={[styles.msgAvatar, isMe ? styles.msgAvatarMe : styles.msgAvatarThem]}>
+                      {msg.sender.profile_image
+                        ? <Image source={{ uri: msg.sender.profile_image }} style={StyleSheet.absoluteFill} />
+                        : <Text style={{ color: isMe ? c.accent : '#7986CB', fontSize: 12, fontWeight: '700' }}>
+                            {msg.sender.name?.charAt(0)?.toUpperCase() ?? '?'}
+                          </Text>}
+                    </View>
+                    <View style={[styles.msgBubbleWrap, isMe && { alignItems: 'flex-end' }]}>
+                      <Text style={[styles.msgSender, isMe && { textAlign: 'right', color: c.textMuted }]}>
+                        {isMe ? 'You' : msg.sender.name}
+                      </Text>
+                      <View style={[styles.msgBubble, isMe ? styles.msgBubbleMe : styles.msgBubbleThem]}>
+                        <Text style={[styles.msgText, isMe && { color: '#fff' }]}>{msg.body}</Text>
+                      </View>
+                      <Text style={[styles.msgTime, isMe && { textAlign: 'right' }]}>
+                        {timeAgo(msg.createdAt)}
+                        {msg.readAt && isMe ? <Text style={{ color: c.accent }}> · Read</Text> : null}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+
+          {/* Input */}
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.input}
+              value={newMsg}
+              onChangeText={setNewMsg}
+              placeholder={`Message ${active.firmName}…`}
+              placeholderTextColor={c.textMuted}
+              multiline
+              returnKeyType="send"
+              onSubmitEditing={handleSend}
+            />
+            <TouchableOpacity
+              style={[styles.sendBtn, (!newMsg.trim() || sending) && { opacity: 0.45 }]}
+              onPress={handleSend}
+              disabled={!newMsg.trim() || sending}
+            >
+              {sending
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="send" size={18} color="#fff" />}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
+  }
+
+  /* ── Thread list ─────────────────────────────────────────────────── */
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.title}>Profile</Text>
+        <Text style={styles.title}>Inbox</Text>
+        {totalUnread > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
+          </View>
+        )}
       </View>
 
       {isLoading ? (
-        <View style={styles.center}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={c.accent} size="large" />
         </View>
+      ) : threads.length === 0 ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32 }}>
+          <Ionicons name="chatbubbles-outline" size={52} color={c.border3} />
+          <Text style={{ color: c.textMuted, fontSize: 16, fontWeight: '600' }}>No messages yet</Text>
+          <Text style={{ color: c.textDim, fontSize: 13, textAlign: 'center' }}>
+            Once a recruiter contacts you about your application, conversations will appear here.
+          </Text>
+        </View>
       ) : (
-        <ScrollView
+        <FlatList
+          data={threads}
+          keyExtractor={(t) => t.threadId}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 40 }}
-          refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={c.accent} />
-          }
-        >
-          {/* ── Identity card ────────────────────────────────────── */}
-          <View style={styles.identityCard}>
-            <Initials name={profile?.name ?? '?'} size={72} c={c} />
-            <View style={styles.identityText}>
-              <Text style={styles.nameText}>{profile?.name ?? '—'}</Text>
-              {profile?.profile?.headline ? (
-                <Text style={styles.headlineText} numberOfLines={1}>{profile.profile.headline}</Text>
-              ) : (
-                <Text style={styles.headlinePlaceholder}>Add a headline</Text>
-              )}
-              <View style={styles.pillRow}>
-                {profile?.isEmailVerified && (
-                  <View style={[styles.pill, { backgroundColor: c.accent + '18', borderColor: c.accentBorder }]}>
-                    <Ionicons name="checkmark-circle" size={12} color={c.accent} />
-                    <Text style={[styles.pillText, { color: c.accent }]}>Verified</Text>
-                  </View>
-                )}
-                {profile?.profile?.openToWork && (
-                  <View style={[styles.pill, { backgroundColor: '#1565C018', borderColor: '#1565C030' }]}>
-                    <Text style={[styles.pillText, { color: '#1565C0' }]}>Open to Work</Text>
-                  </View>
-                )}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          refreshing={isRefetching}
+          onRefresh={refetch}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.threadItem}
+              onPress={() => openThread(item)}
+              activeOpacity={0.75}
+            >
+              <View style={styles.firmLogoWrap}>
+                {item.firm.logo
+                  ? <Image source={{ uri: item.firm.logo }} style={StyleSheet.absoluteFill} />
+                  : <Text style={styles.firmLogoInitial}>{item.firm.name?.charAt(0)?.toUpperCase() ?? '?'}</Text>}
               </View>
-            </View>
-          </View>
-
-          {/* ── Stats row ─────────────────────────────────────────── */}
-          <View style={styles.statsRow}>
-            {[
-              { label: 'Applied', value: stats?.applied ?? 0, icon: 'document-text-outline', color: '#1565C0' },
-              { label: 'Interviews', value: stats?.interviews ?? 0, icon: 'videocam-outline', color: '#6A1B9A' },
-              { label: 'Offers', value: stats?.offers ?? 0, icon: 'trophy-outline', color: c.accent },
-            ].map((s) => (
-              <View key={s.label} style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: s.color + '18' }]}>
-                  <Ionicons name={s.icon as any} size={18} color={s.color} />
-                </View>
-                <Text style={styles.statValue}>{s.value}</Text>
-                <Text style={styles.statLabel}>{s.label}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* ── Profile completion ───────────────────────────────── */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Profile Strength</Text>
-              <Text style={[styles.sectionBadge, { color: completion === 100 ? c.accent : '#E65100' }]}>
-                {completion}%
-              </Text>
-            </View>
-            <View style={styles.progressBg}>
-              <View style={[styles.progressFill, { width: `${completion}%` as any, backgroundColor: completion === 100 ? c.accent : '#E65100' }]} />
-            </View>
-            {completion < 100 && (
-              <Text style={styles.completionHint}>
-                Complete your profile to attract more recruiters
-              </Text>
-            )}
-          </View>
-
-          {/* ── Skills ──────────────────────────────────────────── */}
-          {(profile?.profile?.skills?.length ?? 0) > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Skills</Text>
-              <View style={styles.chipRow}>
-                {profile!.profile!.skills.map((s) => (
-                  <View key={s} style={styles.chip}>
-                    <Text style={styles.chipText}>{s}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* ── Documents ───────────────────────────────────────── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Résumés & Documents</Text>
-            {docsLoading ? (
-              <ActivityIndicator color={c.accent} style={{ marginTop: 12 }} />
-            ) : resumes.length === 0 ? (
-              <View style={styles.emptyDocs}>
-                <Ionicons name="document-outline" size={32} color={c.border3} />
-                <Text style={styles.emptyDocsText}>No résumé uploaded</Text>
-              </View>
-            ) : (
-              resumes.map((doc) => (
-                <View key={doc.id} style={styles.docCard}>
-                  <View style={[styles.docIcon, { backgroundColor: c.accentBg, borderColor: c.accentBorder }]}>
-                    <Ionicons name="document-text-outline" size={20} color={c.accent} />
-                  </View>
-                  <View style={styles.docInfo}>
-                    <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
-                    {doc.size && <Text style={styles.docMeta}>{doc.size}</Text>}
-                  </View>
-                  {doc.isDefault && (
-                    <View style={[styles.defaultBadge, { backgroundColor: c.accentBg, borderColor: c.accentBorder }]}>
-                      <Text style={[styles.defaultText, { color: c.accent }]}>Default</Text>
-                    </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text
+                    style={[styles.threadFirmLabel, item.unreadCount > 0 && { color: c.text, fontWeight: '700' }]}
+                    numberOfLines={1}
+                  >
+                    {item.firm.name}
+                  </Text>
+                  {item.lastMessage && (
+                    <Text style={styles.threadTime}>{timeAgo(item.lastMessage.createdAt)}</Text>
                   )}
                 </View>
-              ))
-            )}
-          </View>
-
-          {/* ── App settings ────────────────────────────────────── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>App Settings</Text>
-
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.settingIcon, { backgroundColor: '#33333318' }]}>
-                  <Ionicons name={isDark ? 'moon' : 'sunny-outline'} size={18} color={c.icon} />
-                </View>
-                <Text style={styles.settingLabel}>Dark Mode</Text>
+                <Text style={styles.threadPost} numberOfLines={1}>{item.postTitle}</Text>
+                {item.lastMessage && (
+                  <Text
+                    style={[styles.threadPreview, item.unreadCount > 0 && { color: c.textSub, fontWeight: '600' }]}
+                    numberOfLines={1}
+                  >
+                    {item.lastMessage.senderId === user?.id ? 'You: ' : ''}{item.lastMessage.body}
+                  </Text>
+                )}
               </View>
-              <Switch
-                value={isDark}
-                onValueChange={toggle}
-                trackColor={{ false: c.border2, true: c.accent + '88' }}
-                thumbColor={isDark ? c.accent : c.textMuted}
-              />
-            </View>
-
-            <TouchableOpacity style={styles.settingRow} onPress={handleLogout} activeOpacity={0.7}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.settingIcon, { backgroundColor: '#C6282818' }]}>
-                  <Ionicons name="log-out-outline" size={18} color="#C62828" />
+              {item.unreadCount > 0 && (
+                <View style={styles.unreadDot}>
+                  <Text style={styles.unreadDotText}>{item.unreadCount}</Text>
                 </View>
-                <Text style={[styles.settingLabel, { color: '#C62828' }]}>Sign Out</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
+              )}
             </TouchableOpacity>
-          </View>
-        </ScrollView>
+          )}
+        />
       )}
     </SafeAreaView>
   );
@@ -244,58 +299,48 @@ export default function ProfileScreen() {
 function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['colors']) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: c.bg },
-    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-    title: { color: c.text, fontSize: 22, fontWeight: '800' },
 
-    // Identity
-    identityCard: { flexDirection: 'row', alignItems: 'center', gap: 16, marginHorizontal: 16, marginBottom: 16, backgroundColor: c.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: c.border },
-    identityText: { flex: 1 },
-    nameText: { color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 2 },
-    headlineText: { color: c.textBody, fontSize: 13, marginBottom: 6 },
-    headlinePlaceholder: { color: c.textMuted, fontSize: 13, fontStyle: 'italic', marginBottom: 6 },
-    pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-    pill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-    pillText: { fontSize: 11, fontWeight: '600' },
+    /* thread list */
+    header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
+    title: { color: c.text, fontSize: 22, fontWeight: '800', flex: 1 },
+    unreadBadge: { backgroundColor: c.accent, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+    unreadBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+    threadItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.border },
+    firmLogoWrap: { width: 48, height: 48, borderRadius: 14, backgroundColor: c.accentBg, borderWidth: 1, borderColor: c.accentBorder, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
+    firmLogoInitial: { color: c.accent, fontSize: 18, fontWeight: '800' },
+    threadFirmLabel: { color: c.textBody, fontSize: 14, fontWeight: '600', flex: 1 },
+    threadPost: { color: c.textMuted, fontSize: 12, marginTop: 2 },
+    threadPreview: { color: c.textMuted, fontSize: 13, marginTop: 3 },
+    threadTime: { color: c.textDim, fontSize: 11, flexShrink: 0 },
+    unreadDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    unreadDotText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
-    // Stats
-    statsRow: { flexDirection: 'row', gap: 10, marginHorizontal: 16, marginBottom: 16 },
-    statCard: { flex: 1, backgroundColor: c.card, borderRadius: 14, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: c.border },
-    statIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    statValue: { color: c.text, fontSize: 20, fontWeight: '800' },
-    statLabel: { color: c.textMuted, fontSize: 11, fontWeight: '600' },
+    /* thread view */
+    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: c.card, borderWidth: 1, borderColor: c.border2, alignItems: 'center', justifyContent: 'center' },
+    threadHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: c.card },
+    threadFirmAvatar: { width: 40, height: 40, borderRadius: 12, backgroundColor: c.accentBg, borderWidth: 1, borderColor: c.accentBorder, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
+    threadFirmInitial: { color: c.accent, fontSize: 16, fontWeight: '700' },
+    threadFirmName: { color: c.text, fontSize: 15, fontWeight: '700' },
+    threadPostTitle: { color: c.textMuted, fontSize: 12 },
 
-    // Sections
-    section: { marginHorizontal: 16, marginBottom: 16, backgroundColor: c.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: c.border },
-    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-    sectionTitle: { color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 12 },
-    sectionBadge: { fontSize: 14, fontWeight: '700' },
+    /* messages */
+    msgList: { padding: 16, gap: 16 },
+    msgRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-end' },
+    msgRowMe: { flexDirection: 'row-reverse' },
+    msgAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, borderWidth: 1, borderColor: c.border2 },
+    msgAvatarMe: { backgroundColor: c.accentBg },
+    msgAvatarThem: { backgroundColor: '#7986CB18' },
+    msgBubbleWrap: { flex: 1, maxWidth: '80%', gap: 3 },
+    msgSender: { color: '#7986CB', fontSize: 11, fontWeight: '700', paddingHorizontal: 2 },
+    msgBubble: { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10 },
+    msgBubbleMe: { backgroundColor: c.accent, borderBottomRightRadius: 4 },
+    msgBubbleThem: { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderBottomLeftRadius: 4 },
+    msgText: { color: c.text, fontSize: 14, lineHeight: 20 },
+    msgTime: { color: c.textDim, fontSize: 10, paddingHorizontal: 2 },
 
-    // Progress
-    progressBg: { height: 8, borderRadius: 4, backgroundColor: c.border2, overflow: 'hidden', marginBottom: 8 },
-    progressFill: { height: '100%', borderRadius: 4 },
-    completionHint: { color: c.textMuted, fontSize: 12, marginTop: 2 },
-
-    // Skills
-    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: -4 },
-    chip: { backgroundColor: c.accentBg, borderWidth: 1, borderColor: c.accentBorder, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
-    chipText: { color: c.accent, fontSize: 12, fontWeight: '600' },
-
-    // Documents
-    emptyDocs: { alignItems: 'center', paddingVertical: 16, gap: 8 },
-    emptyDocsText: { color: c.textMuted, fontSize: 13 },
-    docCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border },
-    docIcon: { width: 40, height: 40, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-    docInfo: { flex: 1 },
-    docName: { color: c.text, fontSize: 14, fontWeight: '600' },
-    docMeta: { color: c.textMuted, fontSize: 11, marginTop: 2 },
-    defaultBadge: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-    defaultText: { fontSize: 11, fontWeight: '700' },
-
-    // Settings
-    settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.border },
-    settingLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    settingIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    settingLabel: { color: c.text, fontSize: 15, fontWeight: '600' },
+    /* input */
+    inputRow: { flexDirection: 'row', gap: 10, padding: 12, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.card, alignItems: 'flex-end' },
+    input: { flex: 1, backgroundColor: c.input, borderWidth: 1, borderColor: c.border2, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, color: c.text, fontSize: 14, maxHeight: 120 },
+    sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   });
 }

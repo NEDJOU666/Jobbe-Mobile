@@ -11,9 +11,27 @@ import Animated, {
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Text } from 'react-native';
+import { authApi } from '@/services/api';
+import { secureStorage } from '@/utils/secureStorage';
 
-function navigate() {
-  router.replace('/(auth)/welcome');
+async function navigateAfterCheck() {
+  try {
+    const user = await authApi.getStoredUser();
+    if (user) {
+      router.replace('/(tabs)');
+      return;
+    }
+    // Fallback: token exists but user object wasn't persisted (e.g. edge-case OAuth)
+    // Route to tabs anyway — hydrate() will fetch from /auth/me and populate the store.
+    const token = await secureStorage.getAccessToken();
+    if (token) {
+      router.replace('/(tabs)');
+      return;
+    }
+    router.replace('/(auth)/welcome');
+  } catch {
+    router.replace('/(auth)/welcome');
+  }
 }
 
 export default function SplashScreen() {
@@ -41,7 +59,7 @@ export default function SplashScreen() {
 
     const timer = setTimeout(() => {
       opacity.value = withTiming(0, { duration: 500 }, (finished) => {
-        if (finished) runOnJS(navigate)();
+        if (finished) runOnJS(navigateAfterCheck)();
       });
       dotOpacity.value = withTiming(0, { duration: 500 });
     }, 2300);

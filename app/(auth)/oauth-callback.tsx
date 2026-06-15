@@ -4,6 +4,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3004/api';
+
 export default function OAuthCallbackScreen() {
   const params = useLocalSearchParams<{ access_token?: string; refresh_token?: string }>();
   const { hydrate } = useAuthStore();
@@ -15,20 +17,39 @@ export default function OAuthCallbackScreen() {
         router.replace('/(auth)/sign-in');
         return;
       }
+
+      // 1. Persist tokens
       await secureStorage.setAccessToken(access_token);
       if (refresh_token) await secureStorage.setRefreshToken(refresh_token);
+
+      // 2. Fetch the user object and save it — this is what normal login does
+      //    and what was MISSING from the OAuth flow.
+      try {
+        const meRes = await fetch(`${API_BASE}/auth/me`, {
+          headers: { Authorization: `Bearer ${access_token}` },
+        });
+        if (meRes.ok) {
+          const user = await meRes.json();
+          await secureStorage.setUser(user);
+        }
+      } catch {}
+
+      // 3. Hydrate Zustand store from storage (user is now saved above)
       await hydrate();
 
-      const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3004/api';
-      const res = await fetch(`${API_BASE}/profile`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      }).catch(() => null);
-      const data = res?.ok ? await res.json() : null;
-      if (data?.role !== 'EMPLOYER' && !data?.profile?.profileCompleted) {
-        router.replace('/onboarding' as any);
-      } else {
-        router.replace('/(tabs)');
-      }
+      // 4. Check onboarding
+      try {
+        const profileRes = await fetch(`${API_BASE}/profile`, {
+          headers: { Authorization: `Bearer ${access_token}` },
+        });
+        const profileData = profileRes.ok ? await profileRes.json() : null;
+        if (profileData?.role !== 'EMPLOYER' && !profileData?.profile?.profileCompleted) {
+          router.replace('/onboarding' as any);
+          return;
+        }
+      } catch {}
+
+      router.replace('/(tabs)');
     };
     handle();
   }, []);

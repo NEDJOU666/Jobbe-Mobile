@@ -2,9 +2,9 @@ import { useCredits } from '@/hooks/useCredits';
 import { useTheme } from '@/hooks/useTheme';
 import { api } from '@/lib/api';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Modal,
   Platform, ScrollView, StyleSheet, Text, TextInput,
@@ -22,6 +22,13 @@ interface CreditPack {
   currency: string;
   label?: string;
 }
+
+type PaymentState = 'idle' | 'paying' | 'waiting' | 'success' | 'failed';
+
+const PROVIDERS = [
+  { value: 'MTN', label: 'MTN MoMo', color: '#FFC107' },
+  { value: 'ORANGE', label: 'Orange Money', color: '#FF6D00' },
+] as const;
 
 const TX_LABEL: Record<string, string> = {
   PURCHASE: 'Credits purchased',
@@ -46,6 +53,7 @@ export default function CreditsScreen() {
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError, refetch } = useCredits();
   const { data: packs = [], isLoading: packsLoading } = useCreditPacks();
@@ -55,40 +63,89 @@ export default function CreditsScreen() {
 
   const [selectedPack, setSelectedPack] = useState<CreditPack | null>(null);
   const [phone, setPhone] = useState('');
-  const [paying, setPaying] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [provider, setProvider] = useState<'MTN' | 'ORANGE'>('MTN');
+  const [paymentState, setPaymentState] = useState<PaymentState>('idle');
+  const [pendingPaymentId, setPendingPaymentId] = useState<string | null>(null);
+  const [creditsGranted, setCreditsGranted] = useState(0);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  }, []);
+
+  const startPolling = useCallback((paymentId: string) => {
+    let attempts = 0;
+    pollRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await api.get(`/payments/${paymentId}/status`);
+        const data = res.data as { status: string; creditsGranted: number };
+        if (data.status === 'SUCCESS') {
+          stopPolling();
+          setCreditsGranted(data.creditsGranted ?? 0);
+          setPaymentState('success');
+          queryClient.invalidateQueries({ queryKey: ['credits'] });
+          refetch();
+        } else if (data.status === 'FAILED') {
+          stopPolling();
+          setPaymentState('failed');
+        } else if (attempts >= 40) {
+          stopPolling();
+          setPaymentState('failed');
+        }
+      } catch {}
+    }, 3000);
+  }, [stopPolling, queryClient, refetch]);
 
   const openBuy = (pack: CreditPack) => {
+    stopPolling();
     setSelectedPack(pack);
     setPhone('');
-    setSuccess(false);
+    setProvider('MTN');
+    setPaymentState('idle');
+    setCreditsGranted(0);
+    setPendingPaymentId(null);
   };
 
   const closeModal = () => {
+    stopPolling();
     setSelectedPack(null);
-    setSuccess(false);
+    setPaymentState('idle');
+    setPendingPaymentId(null);
   };
 
   const handlePay = async () => {
     if (!selectedPack) return;
-    const clean = phone.replace(/\s/g, '');
-    if (!/^\d{9,15}$/.test(clean)) {
+    const clean = phone.replace(/\D/g, '');
+    if (clean.length < 9 || clean.length > 15) {
       Alert.alert('Invalid number', 'Enter a valid mobile money number (9–15 digits).');
       return;
     }
-    setPaying(true);
+    setPaymentState('paying');
     try {
-      await api.post('/payments/fapshi/initiate', {
+      const res = await api.post('/payments/fapshi/initiate', {
         packId: selectedPack.id,
         phone: clean,
+        provider,
       });
-      setSuccess(true);
-      refetch();
+      const data = res.data as { success: boolean; paymentId: string };
+      if (data.success && data.paymentId) {
+        setPendingPaymentId(data.paymentId);
+        setPaymentState('waiting');
+        startPolling(data.paymentId);
+      } else {
+        setPaymentState('idle');
+        Alert.alert('Payment Error', 'Could not initiate payment. Please try again.');
+      }
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'Payment failed. Please try again.';
-      Alert.alert('Payment Error', msg);
-    } finally {
-      setPaying(false);
+      setPaymentState('idle');
+      const raw = err?.response?.data?.message;
+      const msg = Array.isArray(raw) ? raw.join('\n') : (raw ?? 'Payment failed. Please try again.');
+      Alert.alert('Payment Error', String(msg));
     }
   };
 
@@ -159,15 +216,13 @@ export default function CreditsScreen() {
               <View key={pack.id} style={[styles.planCard, isPopular && styles.planCardPopular]}>
                 {pack.label && (
                   <View style={[styles.popularBadge, !isPopular && styles.labelBadge]}>
-                    <Text style={styles.popularText}>{pack.label}</Text>
+                    <Text style={[styles.popularText, !isPopular && { color: c.textMuted }]}>{pack.label}</Text>
                   </View>
                 )}
                 <View style={styles.planTop}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.planName}>{pack.name}</Text>
-                    {pack.description ? (
-                      <Text style={styles.planDesc}>{pack.description}</Text>
-                    ) : null}
+                    {pack.description ? <Text style={styles.planDesc}>{pack.description}</Text> : null}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
                       <Text style={styles.planCredits}>{total} credits</Text>
                       {pack.bonusCredits > 0 && (
@@ -203,7 +258,7 @@ export default function CreditsScreen() {
           <Text style={styles.sectionHint}>No transactions yet.</Text>
         ) : (
           transactions.map((tx) => {
-            const isIncoming = tx.type === 'PURCHASE' || tx.type === 'REFUND' || tx.type === 'BONUS';
+            const isIncoming = tx.amount > 0;
             return (
               <View key={tx.id} style={styles.historyRow}>
                 <View style={[styles.historyIcon, { backgroundColor: isIncoming ? '#14A80018' : '#C6282818' }]}>
@@ -230,89 +285,185 @@ export default function CreditsScreen() {
 
       {/* Purchase Modal */}
       <Modal visible={!!selectedPack} transparent animationType="slide" onRequestClose={closeModal}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={closeModal} />
-          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}>
-            {success ? (
-              <View style={styles.successBox}>
-                <Ionicons name="checkmark-circle" size={56} color={c.accent} />
-                <Text style={styles.successTitle}>Payment Initiated!</Text>
-                <Text style={styles.successMsg}>
-                  You'll receive a push on your phone to confirm{' '}
-                  <Text style={{ fontWeight: '800' }}>
-                    {selectedPack?.price.toLocaleString()} {selectedPack?.currency}
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => paymentState === 'idle' && closeModal()}
+          />
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}>
+
+              {/* SUCCESS */}
+              {paymentState === 'success' && (
+                <View style={styles.stateBox}>
+                  <Ionicons name="checkmark-circle" size={60} color={c.accent} />
+                  <Text style={styles.stateTitle}>Payment Confirmed!</Text>
+                  <Text style={styles.stateMsg}>
+                    <Text style={{ fontWeight: '800' }}>{creditsGranted > 0 ? creditsGranted.toLocaleString() : (selectedPack?.credits ?? 0) + (selectedPack?.bonusCredits ?? 0)} credits</Text>
+                    {' '}have been added to your account.
                   </Text>
-                  .{'\n'}Credits will be added once confirmed.
-                </Text>
-                <TouchableOpacity style={[styles.buyBtn, styles.buyBtnPopular, { marginTop: 8 }]} onPress={closeModal}>
-                  <Text style={styles.buyBtnTextPopular}>Done</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <>
-                <View style={styles.modalHandle} />
-                <View style={styles.modalHeader}>
-                  <View>
-                    <Text style={styles.modalTitle}>Complete Purchase</Text>
-                    <Text style={styles.modalSubtitle}>{selectedPack?.name}</Text>
-                  </View>
-                  <TouchableOpacity onPress={closeModal}>
-                    <Ionicons name="close" size={22} color={c.textMuted} />
+                  <TouchableOpacity style={[styles.buyBtn, styles.buyBtnPopular, { marginTop: 8 }]} onPress={closeModal}>
+                    <Text style={styles.buyBtnTextPopular}>Done</Text>
                   </TouchableOpacity>
                 </View>
+              )}
 
-                {/* Pack summary */}
-                <View style={styles.packSummary}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="wallet-outline" size={18} color="#F57F17" />
-                    <Text style={styles.summaryCredits}>
-                      {((selectedPack?.credits ?? 0) + (selectedPack?.bonusCredits ?? 0)).toLocaleString()} credits
+              {/* WAITING */}
+              {paymentState === 'waiting' && (
+                <View style={styles.stateBox}>
+                  <View style={styles.waitingCircle}>
+                    <Ionicons name="phone-portrait-outline" size={30} color="#F57F17" />
+                  </View>
+                  <Text style={styles.stateTitle}>Check Your Phone</Text>
+                  <Text style={styles.stateMsg}>
+                    A push notification was sent to{' '}
+                    <Text style={{ fontWeight: '700' }}>{phone.replace(/\D/g, '')}</Text>.
+                    {'\n\n'}Approve the{' '}
+                    <Text style={{ fontWeight: '700' }}>
+                      {provider === 'MTN' ? 'MTN Mobile Money' : 'Orange Money'}
+                    </Text>
+                    {' '}payment of{' '}
+                    <Text style={{ fontWeight: '700' }}>
+                      {selectedPack?.price.toLocaleString()} {selectedPack?.currency}
+                    </Text>
+                    {' '}on your phone.
+                  </Text>
+                  <View style={styles.checkingRow}>
+                    <ActivityIndicator size="small" color={c.textMuted} />
+                    <Text style={styles.checkingText}>Checking status every 3s…</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.buyBtn, { borderColor: c.border2, marginTop: 8 }]}
+                    onPress={closeModal}
+                  >
+                    <Text style={[styles.buyBtnText, { color: c.textMuted }]}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* FAILED */}
+              {paymentState === 'failed' && (
+                <View style={styles.stateBox}>
+                  <View style={[styles.waitingCircle, { backgroundColor: '#FFEBEE' }]}>
+                    <Ionicons name="close-circle-outline" size={30} color="#C62828" />
+                  </View>
+                  <Text style={[styles.stateTitle, { color: '#C62828' }]}>Payment Failed</Text>
+                  <Text style={styles.stateMsg}>
+                    The payment was declined or expired. Please try again.
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.buyBtn, { flex: 1, borderColor: c.border2 }]}
+                      onPress={closeModal}
+                    >
+                      <Text style={[styles.buyBtnText, { color: c.textMuted }]}>Close</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.buyBtn, styles.buyBtnPopular, { flex: 1 }]}
+                      onPress={() => setPaymentState('idle')}
+                    >
+                      <Text style={styles.buyBtnTextPopular}>Try Again</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* IDLE / FORM */}
+              {(paymentState === 'idle' || paymentState === 'paying') && (
+                <>
+                  <View style={styles.modalHandle} />
+                  <View style={styles.modalHeader}>
+                    <View>
+                      <Text style={styles.modalTitle}>Complete Purchase</Text>
+                      <Text style={styles.modalSubtitle}>{selectedPack?.name}</Text>
+                    </View>
+                    <TouchableOpacity onPress={closeModal}>
+                      <Ionicons name="close" size={22} color={c.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Pack summary */}
+                  <View style={styles.packSummary}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="wallet-outline" size={18} color="#F57F17" />
+                      <Text style={styles.summaryCredits}>
+                        {((selectedPack?.credits ?? 0) + (selectedPack?.bonusCredits ?? 0)).toLocaleString()} credits
+                      </Text>
+                    </View>
+                    <Text style={styles.summaryPrice}>
+                      {selectedPack?.price.toLocaleString()} {selectedPack?.currency}
                     </Text>
                   </View>
-                  <Text style={styles.summaryPrice}>
-                    {selectedPack?.price.toLocaleString()} {selectedPack?.currency}
+
+                  {/* Provider selector */}
+                  <Text style={styles.inputLabel}>Payment Method</Text>
+                  <View style={styles.providerRow}>
+                    {PROVIDERS.map((p) => (
+                      <TouchableOpacity
+                        key={p.value}
+                        style={[
+                          styles.providerBtn,
+                          provider === p.value && { borderColor: c.accent, backgroundColor: c.accentBg },
+                        ]}
+                        onPress={() => setProvider(p.value)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={[styles.providerDot, { backgroundColor: p.color }]} />
+                        <Text style={[
+                          styles.providerLabel,
+                          provider === p.value && { color: c.accent, fontWeight: '700' },
+                        ]}>
+                          {p.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Phone input */}
+                  <Text style={[styles.inputLabel, { marginTop: 14 }]}>Mobile Money Number</Text>
+                  <View style={styles.inputRow}>
+                    <Ionicons name="phone-portrait-outline" size={18} color={c.textMuted} style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={styles.input}
+                      value={phone}
+                      onChangeText={setPhone}
+                      placeholder="e.g. 6XXXXXXXX"
+                      placeholderTextColor={c.textDim}
+                      keyboardType="phone-pad"
+                      maxLength={15}
+                    />
+                  </View>
+                  <Text style={styles.inputHint}>
+                    {provider === 'MTN' ? 'MTN MoMo' : 'Orange Money'} number (Cameroon)
                   </Text>
-                </View>
 
-                <Text style={styles.inputLabel}>Mobile Money Number</Text>
-                <View style={styles.inputRow}>
-                  <Ionicons name="phone-portrait-outline" size={18} color={c.textMuted} style={{ marginRight: 8 }} />
-                  <TextInput
-                    style={styles.input}
-                    value={phone}
-                    onChangeText={setPhone}
-                    placeholder="e.g. 6XXXXXXXX"
-                    placeholderTextColor={c.textDim}
-                    keyboardType="phone-pad"
-                    maxLength={15}
-                  />
-                </View>
-                <Text style={styles.inputHint}>MTN or Orange Mobile Money number (Cameroon)</Text>
+                  <TouchableOpacity
+                    style={[styles.buyBtn, styles.buyBtnPopular, paymentState === 'paying' && { opacity: 0.6 }]}
+                    activeOpacity={0.85}
+                    onPress={handlePay}
+                    disabled={paymentState === 'paying' || !phone.trim()}
+                  >
+                    {paymentState === 'paying' ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <>
+                        <Ionicons name="flash" size={16} color="#fff" />
+                        <Text style={styles.buyBtnTextPopular}>
+                          Pay {selectedPack?.price.toLocaleString()} {selectedPack?.currency}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.buyBtn, styles.buyBtnPopular, paying && { opacity: 0.6 }]}
-                  activeOpacity={0.85}
-                  onPress={handlePay}
-                  disabled={paying || !phone.trim()}
-                >
-                  {paying ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <>
-                      <Ionicons name="flash" size={16} color="#fff" />
-                      <Text style={styles.buyBtnTextPopular}>
-                        Pay {selectedPack?.price.toLocaleString()} {selectedPack?.currency}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </KeyboardAvoidingView>
+                  <Text style={styles.pushHint}>
+                    You'll receive a push notification to approve on your phone.
+                  </Text>
+                </>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </View>
   );
@@ -375,12 +526,21 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     packSummary: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: c.bg, borderRadius: 14, padding: 14, marginBottom: 16 },
     summaryCredits: { color: c.text, fontSize: 15, fontWeight: '700' },
     summaryPrice: { color: c.accent, fontSize: 16, fontWeight: '800' },
+    providerRow: { flexDirection: 'row', gap: 10 },
+    providerBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1.5, borderColor: c.border2 },
+    providerDot: { width: 12, height: 12, borderRadius: 6 },
+    providerLabel: { color: c.textSub, fontSize: 13, fontWeight: '500' },
     inputLabel: { color: c.textMuted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
     inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.bg, borderRadius: 12, borderWidth: 1, borderColor: c.border2, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 6 },
     input: { flex: 1, color: c.text, fontSize: 15 },
     inputHint: { color: c.textDim, fontSize: 11, marginBottom: 20 },
-    successBox: { alignItems: 'center', gap: 12, paddingVertical: 16 },
-    successTitle: { color: c.text, fontSize: 20, fontWeight: '800' },
-    successMsg: { color: c.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+    pushHint: { color: c.textDim, fontSize: 11, textAlign: 'center', marginTop: 10 },
+    // State screens
+    stateBox: { alignItems: 'center', gap: 12, paddingVertical: 16 },
+    stateTitle: { color: c.text, fontSize: 20, fontWeight: '800' },
+    stateMsg: { color: c.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 21 },
+    waitingCircle: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#FFF8E1', alignItems: 'center', justifyContent: 'center' },
+    checkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+    checkingText: { color: c.textDim, fontSize: 12 },
   });
 }
