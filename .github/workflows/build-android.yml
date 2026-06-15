@@ -1,9 +1,7 @@
 name: Build & Release Android APK
 
 on:
-  # Manual trigger from GitHub Actions tab
   workflow_dispatch:
-  # Auto-trigger when app version in app.json changes on master
   push:
     branches: [master]
     paths:
@@ -38,7 +36,7 @@ jobs:
       - name: Build APK on EAS
         run: eas build --platform android --profile production --non-interactive
 
-      - name: Get APK download URL
+      - name: Get APK download URL from EAS
         id: apk
         run: |
           URL=$(eas build:list --platform android --status finished --limit 1 --non-interactive --json | jq -r '.[0].artifacts.buildUrl')
@@ -47,25 +45,36 @@ jobs:
       - name: Download APK
         run: curl -L "${{ steps.apk.outputs.url }}" -o jobfinder.apk
 
-      - name: Get app version from app.json
+      - name: Get app version
         id: version
         run: echo "version=$(node -p "require('./app.json').expo.version")" >> $GITHUB_OUTPUT
 
-      - name: Create GitHub Release
+      - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: JobFinder v${{ steps.version.outputs.version }}
           body: |
-            ## JobFinder Android APK
-
-            Download and install directly on your Android phone.
-
-            **Installation:**
-            1. Download `jobfinder.apk` below
-            2. Open the file on your phone
-            3. Allow installation from unknown sources if prompted
-            4. Tap Install
+            Android APK build — download via the app website at https://jobfinder.oxbiy.com
           files: jobfinder.apk
           make_latest: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update ANDROID_APK_URL in Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+        run: |
+          APK_DIRECT_URL="https://github.com/NEDJOU666/Jobbe-Mobile/releases/download/v${{ steps.version.outputs.version }}/jobfinder.apk"
+          # Update production env var
+          curl -s -X POST "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env" \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"key\": \"ANDROID_APK_URL\",
+              \"value\": \"${APK_DIRECT_URL}\",
+              \"type\": \"plain\",
+              \"target\": [\"production\"]
+            }"
+          echo "ANDROID_APK_URL set to: $APK_DIRECT_URL"
