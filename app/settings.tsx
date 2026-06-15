@@ -1,10 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert, Modal, Platform, ScrollView, StyleSheet,
+  Alert, Platform, ScrollView, StyleSheet,
   Switch, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,14 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 
-const APP_STORE_URL = Platform.OS === 'ios'
-  ? 'https://apps.apple.com/app/jobfinder/id000000000'
-  : 'https://play.google.com/store/apps/details?id=com.prtresor.jobfinder';
 
-const LANGUAGES = [
-  { code: 'en', label: 'English' },
-  { code: 'fr', label: 'Français' },
-];
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -40,8 +32,6 @@ export default function SettingsScreen() {
   const [showSalary, setShowSalary] = useState(true);
   const [openToWork, setOpenToWork] = useState(false);
   const [hydrated, setHydrated] = useState(false);
-  const [language, setLanguage] = useState('en');
-  const [showLangPicker, setShowLangPicker] = useState(false);
 
   // Seed toggles from fetched profile
   useEffect(() => {
@@ -49,16 +39,14 @@ export default function SettingsScreen() {
     setProfileVisible(profileData.profile.profileVisible ?? true);
     setShowSalary(profileData.profile.showSalary ?? true);
     setOpenToWork(profileData.profile.openToWork ?? false);
+    setEmailAlerts(profileData.profile.emailAlerts ?? true);
     setHydrated(true);
   }, [profileData, hydrated]);
 
-  // Sync push permission status on mount + load saved language
+  // Sync push permission status on mount
   useEffect(() => {
     getNotifications().getPermissionsAsync().then(({ status }) => {
       setPushGranted(status === 'granted');
-    });
-    SecureStore.getItemAsync('app_language').then((saved) => {
-      if (saved) setLanguage(saved);
     });
   }, []);
 
@@ -86,6 +74,11 @@ export default function SettingsScreen() {
         ],
       );
     }
+  };
+
+  const handleEmailAlerts = (v: boolean) => {
+    setEmailAlerts(v);
+    updateProfile({ emailAlerts: v });
   };
 
   const handleProfileVisible = (v: boolean) => {
@@ -122,13 +115,12 @@ export default function SettingsScreen() {
     );
   };
 
-  const handleRateApp = () => Linking.openURL(APP_STORE_URL);
+  const handleRateApp = () =>
+    Alert.alert('Coming Soon', 'JobFinder will be available on the Play Store and App Store soon. Thank you for your support!');
 
   const openWebview = (url: string, title: string) => {
     router.push(`/webview?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}` as any);
   };
-
-  const selectedLang = LANGUAGES.find((l) => l.code === language)?.label ?? 'English';
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
@@ -185,16 +177,9 @@ export default function SettingsScreen() {
         <GroupTitle c={c} label="Notifications" />
         <View style={styles.groupCard}>
           <ToggleRow c={c} icon="mail-outline" label="Email job alerts"
-            value={emailAlerts} onToggle={setEmailAlerts} />
+            value={emailAlerts} onToggle={handleEmailAlerts} />
           <ToggleRow c={c} icon="notifications-outline" label="Push notifications"
             value={pushGranted} onToggle={handlePushToggle} last />
-        </View>
-
-        {/* ── Preferences ── */}
-        <GroupTitle c={c} label="Preferences" />
-        <View style={styles.groupCard}>
-          <SettingRow c={c} icon="language-outline" label="Language"
-            value={selectedLang} onPress={() => setShowLangPicker(true)} last />
         </View>
 
         {/* ── Support ── */}
@@ -239,32 +224,6 @@ export default function SettingsScreen() {
         <View style={{ height: 32 }} />
       </ScrollView>
 
-      {/* Language picker modal */}
-      <Modal visible={showLangPicker} transparent animationType="fade" onRequestClose={() => setShowLangPicker(false)}>
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowLangPicker(false)} />
-          <View style={[styles.langSheet, { backgroundColor: c.card }]}>
-            <Text style={[styles.langTitle, { color: c.text }]}>Select Language</Text>
-            {LANGUAGES.map((l) => (
-              <TouchableOpacity
-                key={l.code}
-                style={[styles.langRow, { borderBottomColor: c.border }]}
-                onPress={() => {
-                  setLanguage(l.code);
-                  SecureStore.setItemAsync('app_language', l.code);
-                  setShowLangPicker(false);
-                }}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.langLabel, { color: l.code === language ? c.accent : c.textSub }]}>
-                  {l.label}
-                </Text>
-                {l.code === language && <Ionicons name="checkmark" size={18} color={c.accent} />}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -355,13 +314,5 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     },
     dangerLabel: { color: '#C62828', fontSize: 14, fontWeight: '600' },
     version: { color: c.textDim, fontSize: 12, textAlign: 'center', marginTop: 4 },
-    modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
-    langSheet: { width: 280, borderRadius: 18, padding: 8, overflow: 'hidden' },
-    langTitle: { fontSize: 15, fontWeight: '700', textAlign: 'center', paddingVertical: 14 },
-    langRow: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1,
-    },
-    langLabel: { fontSize: 15, fontWeight: '500' },
   });
 }

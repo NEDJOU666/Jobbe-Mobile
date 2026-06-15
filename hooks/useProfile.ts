@@ -11,7 +11,7 @@ export interface UserProfileData {
     github: string | null; skills: string[]; languages: string[]
     experience: any; education: any
     openToWork: boolean; profileVisible: boolean; showSalary: boolean
-    profileCompleted: boolean
+    profileCompleted: boolean; emailAlerts: boolean
   } | null
 }
 
@@ -30,7 +30,7 @@ export function useUpdateProfile() {
       phone: string; website: string; linkedin: string; github: string
       skills: string[]; languages: string[]; experience: any; education: any
       openToWork: boolean; profileVisible: boolean; showSalary: boolean
-      avatar: string;
+      emailAlerts: boolean; avatar: string;
     }>) => api.patch('/profile', data).then((r) => r.data),
     onSuccess: (data) => {
       qc.setQueryData(['profile'], data)
