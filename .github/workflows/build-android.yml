@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: APK
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
