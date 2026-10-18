@@ -2,7 +2,7 @@
   "expo": {
     "name": "JobFinder",
     "slug": "jobfinder",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "jobfinder",
@@ -30,7 +30,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.prtresor.jobfinder",
-      "versionCode": 2,
+      "versionCode": 3,
       "intentFilters": [
         {
           "action": "VIEW",
