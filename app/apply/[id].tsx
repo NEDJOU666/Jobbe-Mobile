@@ -115,7 +115,9 @@ export default function ApplyScreen() {
           <View style={styles.successCircle}><Ionicons name="checkmark" size={48} color={c.accent} /></View>
           <Text style={styles.successTitle}>Application Sent!</Text>
           <Text style={styles.successMsg}>
-            Your application has been submitted to {job?.firm?.name ?? 'the company'}. {"They'll"} review it and get back to you.
+            Your application has been submitted to {(job as any)?.source
+              ? ((job as any)?.properties?.scrapedCompany ?? job?.firm?.name ?? 'the company')
+              : (job?.firm?.name ?? 'the company')}. {"They'll"} review it and get back to you.
           </Text>
           <TouchableOpacity style={styles.doneBtn} onPress={() => router.replace('/(tabs)')} activeOpacity={0.85}>
             <Text style={styles.doneBtnText}>Back to Jobs</Text>

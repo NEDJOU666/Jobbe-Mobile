@@ -15,7 +15,7 @@ export interface Job {
   properties: {
     experienceLevel?: string; salaryMin?: number; salaryMax?: number
     currency?: string; skills?: string[]; requirements?: string[]
-    benefits?: string[]; scrapedCompany?: string; applyEmail?: string
+    benefits?: string[]; scrapedCompany?: string; companyAbout?: string; applyEmail?: string
     education?: string; experience?: string
   }
   firm: JobFirm; _count: { applications: number }

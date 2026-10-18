@@ -108,7 +108,7 @@ export default function JobDetailScreen() {
   const creditBalance = creditsData?.balance ?? null;
   const canAfford = creditBalance === null || creditBalance >= creditCost;
   const isScraped = !!source;
-  const { salaryMin, salaryMax, currency = 'XAF', skills = [], requirements = [], benefits = [], experienceLevel, scrapedCompany, education, experience } = properties ?? {};
+  const { salaryMin, salaryMax, currency = 'XAF', skills = [], requirements = [], benefits = [], experienceLevel, scrapedCompany, companyAbout, education, experience } = properties ?? {};
   const displayCompany = isScraped && scrapedCompany ? scrapedCompany : firm.name;
   const displayLocation = location || (isScraped ? '' : `${firm.city}, ${firm.country}`);
 
@@ -278,25 +278,49 @@ export default function JobDetailScreen() {
           </View>
         ) : null}
 
-        {/* About firm */}
+        {/* About firm — scraped posts all share one placeholder system firm
+            record, so its team size/industry/country are meaningless noise
+            for them (always "Agrégateur" etc.). Only show that real-firm
+            grid for actual firm-created posts; scraped posts get whatever
+            companyAbout the AI could pull from the posting itself, plus the
+            post's own location. */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About {displayCompany}</Text>
-          <View style={styles.firmGrid}>
-            {[
-              { icon: 'location-outline',  label: 'Location', value: firm.city },
-              { icon: 'people-outline',    label: 'Team size', value: (firm as any).size ?? '—' },
-              { icon: 'briefcase-outline', label: 'Industry',  value: (firm as any).domain_role },
-              { icon: 'globe-outline',     label: 'Country',   value: firm.country },
-            ].map(({ icon, label, value }) => (
-              <View key={label} style={styles.firmGridItem}>
-                <Ionicons name={icon as any} size={16} color={c.accent} />
+          {isScraped ? (
+            <>
+              {companyAbout ? (
+                <Text style={[styles.sectionBody, { marginBottom: 12 }]}>{companyAbout}</Text>
+              ) : (
+                <Text style={[styles.sectionBody, { marginBottom: 12, fontStyle: 'italic', opacity: 0.7 }]}>
+                  No company description available for this listing.
+                </Text>
+              )}
+              <View style={styles.firmGridItem}>
+                <Ionicons name="location-outline" size={16} color={c.accent} />
                 <View>
-                  <Text style={styles.firmGridLabel}>{label}</Text>
-                  <Text style={styles.firmGridValue}>{value}</Text>
+                  <Text style={styles.firmGridLabel}>Location</Text>
+                  <Text style={styles.firmGridValue}>{location || '—'}</Text>
                 </View>
               </View>
-            ))}
-          </View>
+            </>
+          ) : (
+            <View style={styles.firmGrid}>
+              {[
+                { icon: 'location-outline',  label: 'Location', value: firm.city },
+                { icon: 'people-outline',    label: 'Team size', value: (firm as any).size ?? '—' },
+                { icon: 'briefcase-outline', label: 'Industry',  value: (firm as any).domain_role },
+                { icon: 'globe-outline',     label: 'Country',   value: firm.country },
+              ].map(({ icon, label, value }) => (
+                <View key={label} style={styles.firmGridItem}>
+                  <Ionicons name={icon as any} size={16} color={c.accent} />
+                  <View>
+                    <Text style={styles.firmGridLabel}>{label}</Text>
+                    <Text style={styles.firmGridValue}>{value}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={{ height: 100 }} />
