@@ -5,20 +5,22 @@ import { WebView } from 'react-native-webview';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 
 export default function WebViewScreen() {
   const { url, title } = useLocalSearchParams<{ url: string; title: string }>();
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
+  const { t } = useT();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   if (!url) {
     return (
       <View style={[styles.center, { backgroundColor: c.bg }]}>
-        <Text style={{ color: c.textMuted }}>No URL provided</Text>
+        <Text style={{ color: c.textMuted }}>{t.webview.noUrl}</Text>
         <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: c.accentBg }]}>
-          <Text style={{ color: c.accent, fontWeight: '700' }}>Go back</Text>
+          <Text style={{ color: c.accent, fontWeight: '700' }}>{t.webview.goBack}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -33,7 +35,7 @@ export default function WebViewScreen() {
         </TouchableOpacity>
         <View style={styles.headerTitle}>
           <Text style={[styles.titleText, { color: c.text }]} numberOfLines={1}>
-            {title ?? 'Apply'}
+            {title ?? t.webview.defaultTitle}
           </Text>
           <Text style={[styles.urlText, { color: c.textMuted }]} numberOfLines={1}>
             {url}
@@ -52,7 +54,7 @@ export default function WebViewScreen() {
       {loading && !error && (
         <View style={[styles.loadingBar, { backgroundColor: c.accentBg }]}>
           <ActivityIndicator size="small" color={c.accent} />
-          <Text style={[styles.loadingText, { color: c.textMuted }]}>Loading application page…</Text>
+          <Text style={[styles.loadingText, { color: c.textMuted }]}>{t.webview.loadingApplication}</Text>
         </View>
       )}
 
@@ -60,12 +62,12 @@ export default function WebViewScreen() {
       {error ? (
         <View style={[styles.center, { flex: 1 }]}>
           <Ionicons name="cloud-offline-outline" size={48} color={c.border} />
-          <Text style={[styles.errorText, { color: c.textMuted }]}>Could not load page</Text>
+          <Text style={[styles.errorText, { color: c.textMuted }]}>{t.webview.couldNotLoad}</Text>
           <TouchableOpacity
             onPress={() => { setError(false); setLoading(true); }}
             style={[styles.backBtn, { backgroundColor: c.accentBg }]}
           >
-            <Text style={{ color: c.accent, fontWeight: '700' }}>Retry</Text>
+            <Text style={{ color: c.accent, fontWeight: '700' }}>{t.webview.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (

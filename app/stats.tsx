@@ -1,38 +1,43 @@
 import type { ApplicationStatus } from '@/hooks/useApplications';
 import { useStats } from '@/hooks/useStats';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const STATUS_META: Record<ApplicationStatus, { label: string; color: string; icon: string }> = {
-  PENDING_REVIEW:    { label: 'Pending Review',    color: '#555',    icon: 'document-text-outline' },
-  FORWARDED_TO_FIRM: { label: 'Forwarded to Firm', color: '#1565C0', icon: 'paper-plane-outline'   },
-  REVIEWING:         { label: 'Under Review',      color: '#E65100', icon: 'eye-outline'           },
-  SHORTLISTED:       { label: 'Shortlisted',       color: '#6A1B9A', icon: 'star-outline'          },
-  INTERVIEW:         { label: 'Interview',         color: '#14A800', icon: 'mic-outline'           },
-  OFFER:             { label: 'Offer',             color: '#F57F17', icon: 'trophy-outline'        },
-  REJECTED:          { label: 'Rejected',          color: '#C62828', icon: 'close-circle-outline'  },
-};
+function getStatusMeta(t: ReturnType<typeof useT>['t']): Record<ApplicationStatus, { label: string; color: string; icon: string }> {
+  return {
+    PENDING_REVIEW:    { label: t.stats.statusPendingReview,    color: '#555',    icon: 'document-text-outline' },
+    FORWARDED_TO_FIRM: { label: t.stats.statusForwardedToFirm, color: '#1565C0', icon: 'paper-plane-outline'   },
+    REVIEWING:         { label: t.stats.statusUnderReview,      color: '#E65100', icon: 'eye-outline'           },
+    SHORTLISTED:       { label: t.stats.statusShortlisted,       color: '#6A1B9A', icon: 'star-outline'          },
+    INTERVIEW:         { label: t.stats.statusInterview,         color: '#14A800', icon: 'mic-outline'           },
+    OFFER:             { label: t.stats.statusOffer,             color: '#F57F17', icon: 'trophy-outline'        },
+    REJECTED:          { label: t.stats.statusRejected,          color: '#C62828', icon: 'close-circle-outline'  },
+  };
+}
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, t: ReturnType<typeof useT>['t']): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t.stats.justNow;
+  if (mins < 60) return t.stats.minutesAgo.replace('{n}', String(mins));
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return t.stats.hoursAgo.replace('{n}', String(hrs));
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return t.stats.daysAgo.replace('{n}', String(days));
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
 export default function StatsScreen() {
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const STATUS_META = useMemo(() => getStatusMeta(t), [t]);
 
   const { data, isLoading, isError, refetch } = useStats();
   const applied = data?.applied ?? 0;
@@ -54,7 +59,7 @@ export default function StatsScreen() {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={c.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Stats</Text>
+        <Text style={styles.headerTitle}>{t.stats.headerTitle}</Text>
         <View style={{ width: 38 }} />
       </View>
 
@@ -63,19 +68,19 @@ export default function StatsScreen() {
       ) : isError ? (
         <View style={styles.center}>
           <Ionicons name="cloud-offline-outline" size={48} color={c.border3} />
-          <Text style={styles.emptyText}>Could not load stats</Text>
+          <Text style={styles.emptyText}>{t.stats.loadError}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t.stats.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {/* KPI grid */}
         <View style={styles.kpiGrid}>
-          <KpiCard c={c} icon="send-outline"    value={applied}      label="Applied"       color="#14A800" />
-          <KpiCard c={c} icon="mic-outline"     value={interviews}   label="Interviews"    color="#1565C0" />
-          <KpiCard c={c} icon="trophy-outline"  value={offers}       label="Offers"        color="#F57F17" />
-          <KpiCard c={c} icon="eye-outline"     value={profileViews} label="Profile Views" color="#6A1B9A" />
+          <KpiCard c={c} icon="send-outline"    value={applied}      label={t.stats.applied}       color="#14A800" />
+          <KpiCard c={c} icon="mic-outline"     value={interviews}   label={t.stats.interviews}    color="#1565C0" />
+          <KpiCard c={c} icon="trophy-outline"  value={offers}       label={t.stats.offers}        color="#F57F17" />
+          <KpiCard c={c} icon="eye-outline"     value={profileViews} label={t.stats.profileViews} color="#6A1B9A" />
         </View>
 
         {/* Saved jobs summary */}
@@ -84,11 +89,11 @@ export default function StatsScreen() {
             <Ionicons name="bookmark-outline" size={18} color={c.accent} />
             <View>
               <Text style={styles.searchValue}>{saved}</Text>
-              <Text style={styles.searchLabel}>jobs saved for later</Text>
+              <Text style={styles.searchLabel}>{t.stats.savedForLater}</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.trendBadge} onPress={() => router.push('/(tabs)/saved')}>
-            <Text style={styles.trendText}>View</Text>
+            <Text style={styles.trendText}>{t.stats.view}</Text>
             <Ionicons name="chevron-forward" size={14} color={c.accent} />
           </TouchableOpacity>
         </View>
@@ -96,20 +101,22 @@ export default function StatsScreen() {
         {/* Interview rate */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Interview Rate</Text>
+            <Text style={styles.cardTitle}>{t.stats.interviewRate}</Text>
             <Text style={styles.cardValue}>{interviewRate}%</Text>
           </View>
           <View style={styles.progressBg}>
             <View style={[styles.progressFill, { width: `${interviewRate}%` }]} />
           </View>
-          <Text style={styles.cardHint}>{interviews} of {applied} applications led to interviews</Text>
+          <Text style={styles.cardHint}>
+            {t.stats.interviewRateHint.replace('{interviews}', String(interviews)).replace('{applied}', String(applied))}
+          </Text>
         </View>
 
         {/* Applications breakdown */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Applications by Status</Text>
+          <Text style={styles.cardTitle}>{t.stats.applicationsByStatus}</Text>
           {statusRows.length === 0 ? (
-            <Text style={styles.cardHint}>No applications yet.</Text>
+            <Text style={styles.cardHint}>{t.stats.noApplications}</Text>
           ) : (
             statusRows.map(({ key, label, count, color }) => (
               <View key={key} style={styles.statusRow}>
@@ -128,9 +135,9 @@ export default function StatsScreen() {
 
         {/* Recent activity */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Recent Activity</Text>
+          <Text style={styles.cardTitle}>{t.stats.recentActivity}</Text>
           {recentActivity.length === 0 ? (
-            <Text style={styles.cardHint}>No recent activity.</Text>
+            <Text style={styles.cardHint}>{t.stats.noRecentActivity}</Text>
           ) : (
             recentActivity.map((act, i) => {
               const meta = STATUS_META[act.status as ApplicationStatus] ?? STATUS_META.PENDING_REVIEW;
@@ -140,8 +147,8 @@ export default function StatsScreen() {
                     <Ionicons name={meta.icon as any} size={16} color={meta.color} />
                   </View>
                   <View style={styles.activityContent}>
-                    <Text style={styles.activityText}>Application status: {meta.label}</Text>
-                    <Text style={styles.activityTime}>{relativeTime(act.date)}</Text>
+                    <Text style={styles.activityText}>{t.stats.activityStatusPrefix}{meta.label}</Text>
+                    <Text style={styles.activityTime}>{relativeTime(act.date, t)}</Text>
                   </View>
                 </View>
               );

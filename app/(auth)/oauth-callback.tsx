@@ -3,12 +3,14 @@ import { useAuthStore } from '@/store/authStore';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useT } from '@/hooks/useT';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3004/api';
 
 export default function OAuthCallbackScreen() {
   const params = useLocalSearchParams<{ access_token?: string; refresh_token?: string }>();
   const { hydrate } = useAuthStore();
+  const { t } = useT();
 
   useEffect(() => {
     const handle = async () => {
@@ -57,7 +59,7 @@ export default function OAuthCallbackScreen() {
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color="#14A800" />
-      <Text style={styles.text}>Signing you in…</Text>
+      <Text style={styles.text}>{t.oauthCallback.signingIn}</Text>
     </View>
   );
 }

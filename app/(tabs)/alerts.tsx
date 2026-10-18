@@ -7,6 +7,8 @@ import {
     type NotificationType,
 } from '@/hooks/useNotifications';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
+import type { TabsTranslations } from '@/i18n/sections/tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Linking from 'expo-linking';
@@ -78,18 +80,19 @@ function resolveNavigation(notif: NotifItem): (() => void) | null {
     }
 }
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, t: TabsTranslations['alerts']) {
     const diff = Date.now() - new Date(iso).getTime();
     const m = Math.floor(diff / 60000);
-    if (m < 1) return 'just now';
-    if (m < 60) return `${m}m ago`;
+    if (m < 1) return t.timeJustNow;
+    if (m < 60) return `${t.timeAgoPrefix}${m}${t.minSuffix}`;
     const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
-    return `${Math.floor(h / 24)}d ago`;
+    if (h < 24) return `${t.timeAgoPrefix}${h}${t.hourSuffix}`;
+    return `${t.timeAgoPrefix}${Math.floor(h / 24)}${t.daySuffix}`;
 }
 
 export default function AlertsScreen() {
     const { colors: c } = useTheme();
+    const { t } = useT();
     const styles = useMemo(() => makeStyles(c), [c]);
     const { data, isLoading, isError, refetch, isRefetching } = useNotifications();
     const { mutate: markRead } = useMarkRead();
@@ -108,7 +111,7 @@ export default function AlertsScreen() {
         <SafeAreaView style={styles.safe}>
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
-                    <Text style={styles.title}>Alerts</Text>
+                    <Text style={styles.title}>{t.alerts.title}</Text>
                     {unread > 0 && (
                         <View style={styles.unreadBadge}>
                             <Text style={styles.unreadText}>{unread}</Text>
@@ -117,7 +120,7 @@ export default function AlertsScreen() {
                 </View>
                 {unread > 0 && (
                     <TouchableOpacity onPress={() => markAllRead()}>
-                        <Text style={styles.markAllBtn}>Mark all read</Text>
+                        <Text style={styles.markAllBtn}>{t.alerts.markAllRead}</Text>
                     </TouchableOpacity>
                 )}
             </View>
@@ -129,9 +132,9 @@ export default function AlertsScreen() {
             ) : isError ? (
                 <View style={styles.center}>
                     <Ionicons name="cloud-offline-outline" size={48} color={c.border3} />
-                    <Text style={styles.emptyText}>Could not load alerts</Text>
+                    <Text style={styles.emptyText}>{t.alerts.loadError}</Text>
                     <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-                        <Text style={styles.retryText}>Retry</Text>
+                        <Text style={styles.retryText}>{t.alerts.retry}</Text>
                     </TouchableOpacity>
                 </View>
             ) : (
@@ -158,12 +161,12 @@ export default function AlertsScreen() {
                                 <View style={styles.content}>
                                     <View style={styles.notifTop}>
                                         <Text style={styles.notifTitle} numberOfLines={1}>{item.title}</Text>
-                                        <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
+                                        <Text style={styles.timeText}>{timeAgo(item.createdAt, t.alerts)}</Text>
                                     </View>
                                     <Text style={styles.notifMsg} numberOfLines={2}>{item.message}</Text>
                                     {hasNav && (
                                         <View style={styles.tapRow}>
-                                            <Text style={styles.tapHint}>Tap to open</Text>
+                                            <Text style={styles.tapHint}>{t.alerts.tapToOpen}</Text>
                                             <Ionicons name="chevron-forward" size={11} color={c.accent} />
                                         </View>
                                     )}
@@ -175,8 +178,8 @@ export default function AlertsScreen() {
                     ListEmptyComponent={
                         <View style={styles.empty}>
                             <Ionicons name="notifications-outline" size={52} color={c.border3} />
-                            <Text style={styles.emptyText}>No alerts yet</Text>
-                            <Text style={styles.emptyHint}>You're all caught up!</Text>
+                            <Text style={styles.emptyText}>{t.alerts.emptyTitle}</Text>
+                            <Text style={styles.emptyHint}>{t.alerts.emptyHint}</Text>
                         </View>
                     }
                 />

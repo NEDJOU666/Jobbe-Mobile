@@ -10,6 +10,7 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@/hooks/useAuth';
+import { useT } from '@/hooks/useT';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3004/api';
 
@@ -32,6 +33,7 @@ function GoogleLogo() {
 }
 
 export default function SignInScreen() {
+  const { t } = useT();
   const { login, isLoading, error, clearError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,15 +42,15 @@ export default function SignInScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert(t.signIn.errorTitle, t.signIn.errorFillFields);
       return;
     }
     try {
       await login(email, password);
       router.replace('/(tabs)');
     } catch (err: any) {
-      const msg = (err as any)?.response?.data?.message || err?.message || 'Please check your credentials';
-      Alert.alert('Login Failed', msg);
+      const msg = (err as any)?.response?.data?.message || err?.message || t.signIn.loginFailedDefault;
+      Alert.alert(t.signIn.loginFailedTitle, msg);
     }
   };
 
@@ -80,12 +82,12 @@ export default function SignInScreen() {
 
         {/* Email Field */}
         <Animated.View entering={FadeInDown.delay(180).duration(500)}>
-          <Text style={styles.fieldLabel}>Username or email</Text>
+          <Text style={styles.fieldLabel}>{t.signIn.usernameOrEmail}</Text>
           <View style={[styles.inputWrapper, focused === 'email' && styles.inputWrapperFocused]}>
             <Ionicons name="person-outline" size={18} color="#666" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Username or Email"
+              placeholder={t.signIn.usernameOrEmailPlaceholder}
               placeholderTextColor="#555"
               value={email}
               onChangeText={setEmail}
@@ -100,12 +102,12 @@ export default function SignInScreen() {
 
         {/* Password Field */}
         <Animated.View entering={FadeInDown.delay(230).duration(500)}>
-          <Text style={styles.fieldLabel}>Password</Text>
+          <Text style={styles.fieldLabel}>{t.signIn.password}</Text>
           <View style={[styles.inputWrapper, focused === 'password' && styles.inputWrapperFocused]}>
             <Ionicons name="lock-closed-outline" size={18} color="#666" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Password"
+              placeholder={t.signIn.passwordPlaceholder}
               placeholderTextColor="#555"
               value={password}
               onChangeText={setPassword}
@@ -134,7 +136,7 @@ export default function SignInScreen() {
             disabled={isLoading}
           >
             <Text style={styles.btnContinueText}>
-              {isLoading ? 'Logging in...' : 'Continue'}
+              {isLoading ? t.signIn.loggingIn : t.signIn.continue}
             </Text>
           </TouchableOpacity>
         </Animated.View>
@@ -147,14 +149,14 @@ export default function SignInScreen() {
             activeOpacity={0.7}
           >
             <Ionicons name="lock-closed-outline" size={13} color="#14A800" />
-            <Text style={styles.forgotText}>Forgot password?</Text>
+            <Text style={styles.forgotText}>{t.signIn.forgotPassword}</Text>
           </TouchableOpacity>
         </Animated.View>
 
         {/* Divider */}
         <Animated.View entering={FadeInDown.delay(400).duration(500)} style={styles.dividerRow}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>OR</Text>
+          <Text style={styles.dividerText}>{t.signIn.or}</Text>
           <View style={styles.dividerLine} />
         </Animated.View>
 
@@ -170,15 +172,15 @@ export default function SignInScreen() {
             )}
           >
             <GoogleLogo />
-            <Text style={styles.googleBtnText}>Continue with Google</Text>
+            <Text style={styles.googleBtnText}>{t.signIn.continueWithGoogle}</Text>
           </TouchableOpacity>
         </Animated.View>
 
         {/* Footer */}
         <Animated.View entering={FadeInDown.delay(510).duration(500)} style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account? </Text>
+          <Text style={styles.footerText}>{t.signIn.noAccount}</Text>
           <TouchableOpacity onPress={() => router.replace('/(auth)/sign-up')} disabled={isLoading}>
-            <Text style={styles.footerLink}>Sign Up</Text>
+            <Text style={styles.footerLink}>{t.signIn.signUp}</Text>
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>

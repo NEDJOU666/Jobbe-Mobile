@@ -1,6 +1,7 @@
 import { JobCard, type Job } from '@/components/JobCard';
 import { useSaved, useToggleSave, type SavedItem } from '@/hooks/useSaved';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
@@ -9,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SavedScreen() {
   const { colors: c } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { data: saved = [], isLoading, isError, refetch, isRefetching } = useSaved();
   const { mutate: toggleSave } = useToggleSave();
@@ -16,7 +18,7 @@ export default function SavedScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.title}>Saved Jobs</Text>
+        <Text style={styles.title}>{t.saved.title}</Text>
         <View style={styles.badge}><Text style={styles.badgeText}>{saved.length}</Text></View>
       </View>
 
@@ -27,9 +29,9 @@ export default function SavedScreen() {
       ) : isError ? (
         <View style={styles.center}>
           <Ionicons name="cloud-offline-outline" size={48} color={c.border3} />
-          <Text style={styles.emptyText}>Could not load saved jobs</Text>
+          <Text style={styles.emptyText}>{t.saved.loadError}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t.saved.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -51,8 +53,8 @@ export default function SavedScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="bookmark-outline" size={52} color={c.border3} />
-              <Text style={styles.emptyText}>No saved jobs</Text>
-              <Text style={styles.emptyHint}>Tap ❤️ on any job to save it here</Text>
+              <Text style={styles.emptyText}>{t.saved.emptyTitle}</Text>
+              <Text style={styles.emptyHint}>{t.saved.emptyHint}</Text>
             </View>
           }
         />

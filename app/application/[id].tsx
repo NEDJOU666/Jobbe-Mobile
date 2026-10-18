@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 import {
   useApplicationDetail, useConfirmInterview,
   useCancelInterview, useRespondOffer,
@@ -18,24 +19,38 @@ import { useSendApplicationMessage } from '@/hooks/useInbox';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STATUS_META: Record<string, { label: string; color: string }> = {
-  PENDING_REVIEW:    { label: 'Pending Review',    color: '#B45309' },
-  FORWARDED_TO_FIRM: { label: 'Forwarded to Firm', color: '#0369A1' },
-  REVIEWING:         { label: 'Reviewing',          color: '#7C3AED' },
-  SHORTLISTED:       { label: 'Shortlisted',        color: '#6D28D9' },
-  INTERVIEW:         { label: 'Interview',           color: '#4F46E5' },
-  OFFER:             { label: 'Offer Received',     color: '#16A34A' },
-  REJECTED:          { label: 'Rejected',            color: '#DC2626' },
+function getStatusMeta(t: any): Record<string, { label: string; color: string }> {
+  return {
+    PENDING_REVIEW:    { label: t.applicationDetail.statusPendingReview,    color: '#B45309' },
+    FORWARDED_TO_FIRM: { label: t.applicationDetail.statusForwardedToFirm, color: '#0369A1' },
+    REVIEWING:         { label: t.applicationDetail.statusReviewing,          color: '#7C3AED' },
+    SHORTLISTED:       { label: t.applicationDetail.statusShortlisted,        color: '#6D28D9' },
+    INTERVIEW:         { label: t.applicationDetail.statusInterview,           color: '#4F46E5' },
+    OFFER:             { label: t.applicationDetail.statusOfferReceived,     color: '#16A34A' },
+    REJECTED:          { label: t.applicationDetail.statusRejected,            color: '#DC2626' },
+  };
 }
 
-const PLATFORM_LABEL: Record<MeetingPlatform, string> = {
-  ZOOM: 'Zoom', GOOGLE_MEET: 'Google Meet', TEAMS: 'Microsoft Teams',
-  PHONE: 'Phone Call', IN_PERSON: 'In Person', OTHER: 'Other',
+function getPlatformLabel(t: any): Record<MeetingPlatform, string> {
+  return {
+    ZOOM: t.applicationDetail.platformZoom, GOOGLE_MEET: t.applicationDetail.platformGoogleMeet, TEAMS: t.applicationDetail.platformTeams,
+    PHONE: t.applicationDetail.platformPhone, IN_PERSON: t.applicationDetail.platformInPerson, OTHER: t.applicationDetail.platformOther,
+  };
 }
 
 const INTERVIEW_STATUS_COLOR: Record<string, string> = {
   SCHEDULED: '#4F46E5', CONFIRMED: '#16A34A',
   COMPLETED: '#6B7280', CANCELLED: '#DC2626', RESCHEDULED: '#D97706',
+}
+
+function getInterviewStatusLabel(t: any): Record<string, string> {
+  return {
+    SCHEDULED: t.applicationDetail.interviewStatusScheduled,
+    CONFIRMED: t.applicationDetail.interviewStatusConfirmed,
+    COMPLETED: t.applicationDetail.interviewStatusCompleted,
+    CANCELLED: t.applicationDetail.interviewStatusCancelled,
+    RESCHEDULED: t.applicationDetail.interviewStatusRescheduled,
+  };
 }
 
 function formatDate(iso: string) {
@@ -44,14 +59,14 @@ function formatDate(iso: string) {
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
-function timeAgo(iso: string) {
+function timeAgo(iso: string, t: any) {
   const diff = Date.now() - new Date(iso).getTime()
   const m = Math.floor(diff / 60000)
-  if (m < 1) return 'Just now'
-  if (m < 60) return `${m}m ago`
+  if (m < 1) return t.applicationDetail.justNow
+  if (m < 60) return `${m}${t.applicationDetail.minutesAgoSuffix}`
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
+  if (h < 24) return `${h}${t.applicationDetail.hoursAgoSuffix}`
+  return `${Math.floor(h / 24)}${t.applicationDetail.daysAgoSuffix}`
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -61,6 +76,10 @@ export default function ApplicationDetailScreen() {
   const insets = useSafeAreaInsets()
   const { colors: c } = useTheme()
   const styles = useMemo(() => makeStyles(c), [c])
+  const { t } = useT()
+  const STATUS_META = useMemo(() => getStatusMeta(t), [t])
+  const PLATFORM_LABEL = useMemo(() => getPlatformLabel(t), [t])
+  const INTERVIEW_STATUS_LABEL = useMemo(() => getInterviewStatusLabel(t), [t])
 
   const { data: app, isLoading, isError, refetch } = useApplicationDetail(id ?? '')
 
@@ -85,38 +104,38 @@ export default function ApplicationDetailScreen() {
 
   const handleConfirm = useCallback(() => {
     if (!app?.interview) return
-    Alert.alert('Confirm Interview', 'Confirm your attendance for this interview?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t.applicationDetail.confirmInterviewAlertTitle, t.applicationDetail.confirmInterviewAlertMessage, [
+      { text: t.applicationDetail.cancelButton, style: 'cancel' },
       {
-        text: 'Confirm', onPress: () =>
+        text: t.applicationDetail.confirmButton, onPress: () =>
           confirmInterview(app.interview!.id, {
             onSuccess: () => refetch(),
           }),
       },
     ])
-  }, [app, confirmInterview, refetch])
+  }, [app, confirmInterview, refetch, t])
 
   const handleCancel = useCallback(() => {
     if (!app?.interview) return
-    Alert.alert('Cancel Interview', 'Are you sure you want to cancel this interview?', [
-      { text: 'No', style: 'cancel' },
+    Alert.alert(t.applicationDetail.cancelInterviewAlertTitle, t.applicationDetail.cancelInterviewAlertMessage, [
+      { text: t.applicationDetail.noButton, style: 'cancel' },
       {
-        text: 'Yes, Cancel', style: 'destructive', onPress: () =>
+        text: t.applicationDetail.yesCancelButton, style: 'destructive', onPress: () =>
           cancelInterview(app.interview!.id, {
             onSuccess: () => refetch(),
           }),
       },
     ])
-  }, [app, cancelInterview, refetch])
+  }, [app, cancelInterview, refetch, t])
 
   const handleReschedule = useCallback(() => {
     if (!app?.interview || !rescheduleDate.trim()) return
     const currentDate = `${formatDate(app.interview.scheduled_at)} at ${formatTime(app.interview.scheduled_at)}`
     const body = [
-      `Hello, I would like to request a reschedule for our interview currently set on ${currentDate}.`,
-      `My preferred date/time: ${rescheduleDate.trim()}`,
-      rescheduleNote.trim() ? `Note: ${rescheduleNote.trim()}` : '',
-      'Thank you.',
+      `${t.applicationDetail.rescheduleMessageIntroPrefix}${currentDate}${t.applicationDetail.rescheduleMessageIntroSuffix}`,
+      `${t.applicationDetail.rescheduleMessagePreferredPrefix}${rescheduleDate.trim()}`,
+      rescheduleNote.trim() ? `${t.applicationDetail.rescheduleMessageNotePrefix}${rescheduleNote.trim()}` : '',
+      t.applicationDetail.rescheduleMessageThanks,
     ].filter(Boolean).join('\n')
 
     sendMsg({ applicationId: id!, body }, {
@@ -130,33 +149,33 @@ export default function ApplicationDetailScreen() {
         })
       },
     })
-  }, [app, id, rescheduleDate, rescheduleNote, sendMsg])
+  }, [app, id, rescheduleDate, rescheduleNote, sendMsg, t])
 
   const handleAcceptOffer = useCallback(() => {
     if (!app) return
-    Alert.alert('Accept Offer', 'Accept this job offer?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t.applicationDetail.acceptOfferAlertTitle, t.applicationDetail.acceptOfferAlertMessage, [
+      { text: t.applicationDetail.cancelButton, style: 'cancel' },
       {
-        text: 'Accept', onPress: () =>
+        text: t.applicationDetail.acceptButton, onPress: () =>
           respondOffer({ applicationId: id!, action: 'accept' }, {
             onSuccess: () => refetch(),
           }),
       },
     ])
-  }, [app, id, respondOffer, refetch])
+  }, [app, id, respondOffer, refetch, t])
 
   const handleDeclineOffer = useCallback(() => {
     if (!app) return
-    Alert.alert('Decline Offer', 'Decline this job offer?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t.applicationDetail.declineOfferAlertTitle, t.applicationDetail.declineOfferAlertMessage, [
+      { text: t.applicationDetail.cancelButton, style: 'cancel' },
       {
-        text: 'Decline', style: 'destructive', onPress: () =>
+        text: t.applicationDetail.declineButton, style: 'destructive', onPress: () =>
           respondOffer({ applicationId: id!, action: 'decline' }, {
             onSuccess: () => refetch(),
           }),
       },
     ])
-  }, [app, id, respondOffer, refetch])
+  }, [app, id, respondOffer, refetch, t])
 
   // ─── Loading / Error ───────────────────────────────────────────────────────
 
@@ -172,9 +191,9 @@ export default function ApplicationDetailScreen() {
     return (
       <View style={[styles.screen, { alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: insets.top }]}>
         <Ionicons name="cloud-offline-outline" size={48} color={c.border3} />
-        <Text style={{ color: c.textMuted }}>Could not load application</Text>
+        <Text style={{ color: c.textMuted }}>{t.applicationDetail.loadErrorText}</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={{ color: c.accent, fontWeight: '600' }}>Go Back</Text>
+          <Text style={{ color: c.accent, fontWeight: '600' }}>{t.applicationDetail.goBackButton}</Text>
         </TouchableOpacity>
       </View>
     )
@@ -216,7 +235,7 @@ export default function ApplicationDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* ── Status Timeline ─────────────────────────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>APPLICATION PROGRESS</Text>
+          <Text style={styles.sectionLabel}>{t.applicationDetail.applicationProgressLabel}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.timeline}>
               {app.status.map((s, i) => {
@@ -240,7 +259,7 @@ export default function ApplicationDetailScreen() {
               })}
             </View>
           </ScrollView>
-          <Text style={styles.metaText}>Applied {formatDate(app.createdAt)}</Text>
+          <Text style={styles.metaText}>{t.applicationDetail.appliedOnPrefix}{formatDate(app.createdAt)}</Text>
         </View>
 
         {/* ── Offer Card ──────────────────────────────────────────────────── */}
@@ -248,33 +267,33 @@ export default function ApplicationDetailScreen() {
           <View style={[styles.card, { borderColor: '#16A34A44' }]}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="trophy-outline" size={16} color="#16A34A" />
-              <Text style={[styles.sectionTitleText, { color: '#16A34A' }]}>Job Offer</Text>
+              <Text style={[styles.sectionTitleText, { color: '#16A34A' }]}>{t.applicationDetail.jobOfferTitle}</Text>
               {app.offer.status !== 'PENDING' && (
                 <View style={[styles.smallBadge, {
                   backgroundColor: app.offer.status === 'ACCEPTED' ? '#dcfce7' : '#fee2e2',
                   borderColor: app.offer.status === 'ACCEPTED' ? '#86efac' : '#fca5a5',
                 }]}>
                   <Text style={{ color: app.offer.status === 'ACCEPTED' ? '#16A34A' : '#DC2626', fontSize: 11, fontWeight: '700' }}>
-                    {app.offer.status === 'ACCEPTED' ? 'Accepted' : 'Declined'}
+                    {app.offer.status === 'ACCEPTED' ? t.applicationDetail.offerAcceptedBadge : t.applicationDetail.offerDeclinedBadge}
                   </Text>
                 </View>
               )}
             </View>
 
             <View style={styles.salaryBox}>
-              <Text style={styles.salaryLabel}>Monthly Salary</Text>
+              <Text style={styles.salaryLabel}>{t.applicationDetail.monthlySalaryLabel}</Text>
               <Text style={styles.salaryAmount}>{Number(app.offer.salary).toLocaleString()} XAF</Text>
             </View>
 
             <View style={styles.offerRow}>
               <Ionicons name="calendar-outline" size={14} color={c.textMuted} />
-              <Text style={styles.offerMeta}>Start date: <Text style={{ color: c.text, fontWeight: '600' }}>{formatDate(app.offer.startDate)}</Text></Text>
+              <Text style={styles.offerMeta}>{t.applicationDetail.startDateLabel} <Text style={{ color: c.text, fontWeight: '600' }}>{formatDate(app.offer.startDate)}</Text></Text>
             </View>
 
             {app.offer.deadline && (
               <View style={styles.offerRow}>
                 <Ionicons name="time-outline" size={14} color="#D97706" />
-                <Text style={[styles.offerMeta, { color: '#D97706' }]}>Respond by: <Text style={{ fontWeight: '700' }}>{formatDate(app.offer.deadline)}</Text></Text>
+                <Text style={[styles.offerMeta, { color: '#D97706' }]}>{t.applicationDetail.respondByLabel} <Text style={{ fontWeight: '700' }}>{formatDate(app.offer.deadline)}</Text></Text>
               </View>
             )}
 
@@ -290,7 +309,7 @@ export default function ApplicationDetailScreen() {
                   disabled={isResponding}
                 >
                   <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
-                  <Text style={[styles.offerBtnText, { color: '#DC2626' }]}>Decline</Text>
+                  <Text style={[styles.offerBtnText, { color: '#DC2626' }]}>{t.applicationDetail.declineButton}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.offerBtn, { backgroundColor: '#16A34A', borderColor: '#16A34A', flex: 1 }]}
@@ -301,7 +320,7 @@ export default function ApplicationDetailScreen() {
                     ? <ActivityIndicator color="#fff" size="small" />
                     : <>
                         <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
-                        <Text style={[styles.offerBtnText, { color: '#fff' }]}>Accept Offer</Text>
+                        <Text style={[styles.offerBtnText, { color: '#fff' }]}>{t.applicationDetail.acceptOfferButton}</Text>
                       </>
                   }
                 </TouchableOpacity>
@@ -315,9 +334,9 @@ export default function ApplicationDetailScreen() {
           <View style={[styles.card, { borderColor: interviewStatusColor + '44' }]}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="videocam-outline" size={16} color={interviewStatusColor} />
-              <Text style={[styles.sectionTitleText, { color: interviewStatusColor }]}>Interview</Text>
+              <Text style={[styles.sectionTitleText, { color: interviewStatusColor }]}>{t.applicationDetail.interviewTitle}</Text>
               <View style={[styles.smallBadge, { backgroundColor: interviewStatusColor + '18', borderColor: interviewStatusColor + '55' }]}>
-                <Text style={{ color: interviewStatusColor, fontSize: 11, fontWeight: '700' }}>{app.interview.status}</Text>
+                <Text style={{ color: interviewStatusColor, fontSize: 11, fontWeight: '700' }}>{INTERVIEW_STATUS_LABEL[app.interview.status] ?? app.interview.status}</Text>
               </View>
             </View>
 
@@ -354,14 +373,14 @@ export default function ApplicationDetailScreen() {
                 onPress={() => Linking.openURL(app.interview!.meeting_link!)}
               >
                 <Ionicons name="videocam-outline" size={16} color={interviewStatusColor} />
-                <Text style={[styles.meetingLinkText, { color: interviewStatusColor }]}>Join Meeting</Text>
+                <Text style={[styles.meetingLinkText, { color: interviewStatusColor }]}>{t.applicationDetail.joinMeetingButton}</Text>
                 <Ionicons name="open-outline" size={14} color={interviewStatusColor} style={{ marginLeft: 'auto' }} />
               </TouchableOpacity>
             )}
 
             {app.interview.feedback && (
               <View style={styles.feedbackBox}>
-                <Text style={styles.feedbackLabel}>FEEDBACK</Text>
+                <Text style={styles.feedbackLabel}>{t.applicationDetail.feedbackLabel}</Text>
                 <Text style={styles.feedbackText}>{app.interview.feedback}</Text>
                 {app.interview.rating && (
                   <Text style={styles.ratingText}>{'★'.repeat(app.interview.rating)}{'☆'.repeat(5 - (app.interview.rating ?? 0))} {app.interview.rating}/5</Text>
@@ -379,7 +398,7 @@ export default function ApplicationDetailScreen() {
                   >
                     {isConfirming
                       ? <ActivityIndicator color="#fff" size="small" />
-                      : <><Ionicons name="checkmark-circle-outline" size={16} color="#fff" /><Text style={[styles.actionBtnText, { color: '#fff' }]}>Confirm Attendance</Text></>
+                      : <><Ionicons name="checkmark-circle-outline" size={16} color="#fff" /><Text style={[styles.actionBtnText, { color: '#fff' }]}>{t.applicationDetail.confirmAttendanceButton}</Text></>
                     }
                   </TouchableOpacity>
                 )}
@@ -389,7 +408,7 @@ export default function ApplicationDetailScreen() {
                     onPress={() => setShowReschedule(true)}
                   >
                     <Ionicons name="calendar-outline" size={15} color={interviewStatusColor} />
-                    <Text style={[styles.actionBtnOutlineText, { color: interviewStatusColor }]}>Reschedule</Text>
+                    <Text style={[styles.actionBtnOutlineText, { color: interviewStatusColor }]}>{t.applicationDetail.rescheduleButton}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionBtnOutline, { borderColor: '#DC262688' }]}
@@ -398,7 +417,7 @@ export default function ApplicationDetailScreen() {
                   >
                     {isCancelling
                       ? <ActivityIndicator color="#DC2626" size="small" />
-                      : <><Ionicons name="close-circle-outline" size={15} color="#DC2626" /><Text style={[styles.actionBtnOutlineText, { color: '#DC2626' }]}>Cancel</Text></>
+                      : <><Ionicons name="close-circle-outline" size={15} color="#DC2626" /><Text style={[styles.actionBtnOutlineText, { color: '#DC2626' }]}>{t.applicationDetail.cancelButton}</Text></>
                     }
                   </TouchableOpacity>
                 </View>
@@ -422,8 +441,8 @@ export default function ApplicationDetailScreen() {
                 <Ionicons name="chatbubbles-outline" size={20} color={c.accent} />
               </View>
               <View>
-                <Text style={styles.messageFirmTitle}>Messages</Text>
-                <Text style={styles.messageFirmSub}>Chat with {app.firm.name}</Text>
+                <Text style={styles.messageFirmTitle}>{t.applicationDetail.messagesTitle}</Text>
+                <Text style={styles.messageFirmSub}>{t.applicationDetail.chatWithPrefix}{app.firm.name}</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
@@ -435,7 +454,7 @@ export default function ApplicationDetailScreen() {
           <View style={styles.card}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="document-text-outline" size={15} color={c.accent} />
-              <Text style={styles.sectionTitleText}>Cover Letter</Text>
+              <Text style={styles.sectionTitleText}>{t.applicationDetail.coverLetterTitle}</Text>
             </View>
             <Text style={styles.bodyText}>{app.coverLetter}</Text>
           </View>
@@ -446,7 +465,7 @@ export default function ApplicationDetailScreen() {
           <View style={styles.card}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="attach-outline" size={15} color={c.accent} />
-              <Text style={styles.sectionTitleText}>Documents</Text>
+              <Text style={styles.sectionTitleText}>{t.applicationDetail.documentsTitle}</Text>
             </View>
             {docs.map((doc, i) => (
               <TouchableOpacity
@@ -464,12 +483,12 @@ export default function ApplicationDetailScreen() {
 
         {/* ── Application Details ───────────────────────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>APPLICATION DETAILS</Text>
+          <Text style={styles.sectionLabel}>{t.applicationDetail.applicationDetailsLabel}</Text>
           {[
-            { label: 'Applied on', value: formatDate(app.createdAt) },
-            { label: 'Last updated', value: formatDate(app.statusUpdatedAt) },
-            app.post.applicationDeadline && { label: 'Job deadline', value: formatDate(app.post.applicationDeadline) },
-            app.salaryExpectation && { label: 'Salary expectation', value: `${app.salaryExpectation.toLocaleString()} XAF/mo` },
+            { label: t.applicationDetail.appliedOnLabel, value: formatDate(app.createdAt) },
+            { label: t.applicationDetail.lastUpdatedLabel, value: formatDate(app.statusUpdatedAt) },
+            app.post.applicationDeadline && { label: t.applicationDetail.jobDeadlineLabel, value: formatDate(app.post.applicationDeadline) },
+            app.salaryExpectation && { label: t.applicationDetail.salaryExpectationLabel, value: `${app.salaryExpectation.toLocaleString()}${t.applicationDetail.xafPerMonthSuffix}` },
           ].filter(Boolean).map((row: any) => (
             <View key={row.label} style={styles.detailRow}>
               <Text style={styles.detailLabel}>{row.label}</Text>
@@ -481,7 +500,7 @@ export default function ApplicationDetailScreen() {
             onPress={() => router.push(`/job/${app.post.id}`)}
           >
             <Ionicons name="briefcase-outline" size={14} color={c.accent} />
-            <Text style={[styles.viewJobText, { color: c.accent }]}>View Job Posting</Text>
+            <Text style={[styles.viewJobText, { color: c.accent }]}>{t.applicationDetail.viewJobPostingButton}</Text>
             <Ionicons name="chevron-forward" size={14} color={c.accent} />
           </TouchableOpacity>
         </View>
@@ -492,26 +511,26 @@ export default function ApplicationDetailScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Request Reschedule</Text>
+            <Text style={styles.modalTitle}>{t.applicationDetail.requestRescheduleTitle}</Text>
             {app.interview && (
               <Text style={styles.modalSub}>
-                Current: {formatDate(app.interview.scheduled_at)} at {formatTime(app.interview.scheduled_at)}
+                {t.applicationDetail.currentPrefix}{formatDate(app.interview.scheduled_at)} at {formatTime(app.interview.scheduled_at)}
               </Text>
             )}
 
-            <Text style={styles.modalFieldLabel}>Your preferred date &amp; time *</Text>
+            <Text style={styles.modalFieldLabel}>{t.applicationDetail.preferredDateTimeLabel}</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="e.g. Tuesday 24 June at 10:00am"
+              placeholder={t.applicationDetail.preferredDateTimePlaceholder}
               placeholderTextColor={c.textMuted}
               value={rescheduleDate}
               onChangeText={setRescheduleDate}
             />
 
-            <Text style={styles.modalFieldLabel}>Additional note (optional)</Text>
+            <Text style={styles.modalFieldLabel}>{t.applicationDetail.additionalNoteLabel}</Text>
             <TextInput
               style={[styles.modalInput, { height: 80, textAlignVertical: 'top' }]}
-              placeholder="Any context for the reschedule…"
+              placeholder={t.applicationDetail.additionalNotePlaceholder}
               placeholderTextColor={c.textMuted}
               value={rescheduleNote}
               onChangeText={setRescheduleNote}
@@ -523,7 +542,7 @@ export default function ApplicationDetailScreen() {
                 style={[styles.modalBtn, { backgroundColor: c.card, borderColor: c.border2 }]}
                 onPress={() => { setShowReschedule(false); setRescheduleDate(''); setRescheduleNote('') }}
               >
-                <Text style={{ color: c.textBody, fontWeight: '600' }}>Cancel</Text>
+                <Text style={{ color: c.textBody, fontWeight: '600' }}>{t.applicationDetail.cancelButton}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: c.accent, flex: 1, opacity: rescheduleDate.trim() ? 1 : 0.4 }]}
@@ -532,7 +551,7 @@ export default function ApplicationDetailScreen() {
               >
                 {isSending
                   ? <ActivityIndicator color="#fff" size="small" />
-                  : <><Ionicons name="send-outline" size={15} color="#fff" /><Text style={{ color: '#fff', fontWeight: '700' }}>Send Request</Text></>
+                  : <><Ionicons name="send-outline" size={15} color="#fff" /><Text style={{ color: '#fff', fontWeight: '700' }}>{t.applicationDetail.sendRequestButton}</Text></>
                 }
               </TouchableOpacity>
             </View>

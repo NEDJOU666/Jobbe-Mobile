@@ -1,5 +1,7 @@
 import { useApplications, useWithdraw, type Application, type ApplicationStatus, type Interview, type MeetingPlatform } from '@/hooks/useApplications';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
+import type { TabsTranslations } from '@/i18n/sections/tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -12,15 +14,17 @@ function currentStatus(statuses: Status[]): Status {
   return statuses[statuses.length - 1];
 }
 
-const STATUS_META: Record<Status, { label: string; color: string; icon: string }> = {
-  PENDING_REVIEW:    { label: 'Pending Review',    color: '#666',    icon: 'time-outline' },
-  FORWARDED_TO_FIRM: { label: 'Forwarded to Firm', color: '#1565C0', icon: 'arrow-forward-circle-outline' },
-  REVIEWING:         { label: 'Reviewing',          color: '#E65100', icon: 'eye-outline' },
-  SHORTLISTED:       { label: 'Shortlisted',        color: '#6A1B9A', icon: 'star-outline' },
-  INTERVIEW:         { label: 'Interview',           color: '#14A800', icon: 'videocam-outline' },
-  OFFER:             { label: 'Offer Received',     color: '#14A800', icon: 'trophy-outline' },
-  REJECTED:          { label: 'Rejected',            color: '#C62828', icon: 'close-circle-outline' },
-};
+function getStatusMeta(t: TabsTranslations['applications']): Record<Status, { label: string; color: string; icon: string }> {
+  return {
+    PENDING_REVIEW:    { label: t.statusPendingReview,    color: '#666',    icon: 'time-outline' },
+    FORWARDED_TO_FIRM: { label: t.statusForwardedToFirm, color: '#1565C0', icon: 'arrow-forward-circle-outline' },
+    REVIEWING:         { label: t.statusReviewing,          color: '#E65100', icon: 'eye-outline' },
+    SHORTLISTED:       { label: t.statusShortlisted,        color: '#6A1B9A', icon: 'star-outline' },
+    INTERVIEW:         { label: t.statusInterview,           color: '#14A800', icon: 'videocam-outline' },
+    OFFER:             { label: t.statusOffer,     color: '#14A800', icon: 'trophy-outline' },
+    REJECTED:          { label: t.statusRejected,            color: '#C62828', icon: 'close-circle-outline' },
+  };
+}
 
 const PLATFORM_ICON: Record<MeetingPlatform, string> = {
   ZOOM:        'videocam-outline',
@@ -31,14 +35,16 @@ const PLATFORM_ICON: Record<MeetingPlatform, string> = {
   OTHER:       'link-outline',
 };
 
-const PLATFORM_LABEL: Record<MeetingPlatform, string> = {
-  ZOOM:        'Zoom',
-  GOOGLE_MEET: 'Google Meet',
-  TEAMS:       'Microsoft Teams',
-  PHONE:       'Phone Call',
-  IN_PERSON:   'In Person',
-  OTHER:       'Other',
-};
+function getPlatformLabel(t: TabsTranslations['applications']): Record<MeetingPlatform, string> {
+  return {
+    ZOOM:        t.platformZoom,
+    GOOGLE_MEET: t.platformGoogleMeet,
+    TEAMS:       t.platformTeams,
+    PHONE:       t.platformPhone,
+    IN_PERSON:   t.platformInPerson,
+    OTHER:       t.platformOther,
+  };
+}
 
 const INTERVIEW_STATUS_COLOR: Record<string, string> = {
   SCHEDULED:   '#1565C0',
@@ -48,17 +54,28 @@ const INTERVIEW_STATUS_COLOR: Record<string, string> = {
   RESCHEDULED: '#E65100',
 };
 
-function formatInterviewDate(iso: string) {
-  const d = new Date(iso);
+function getInterviewStatusLabel(t: TabsTranslations['applications']): Record<string, string> {
   return {
-    date: d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
-    time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+    SCHEDULED:   t.interviewStatusScheduled,
+    CONFIRMED:   t.interviewStatusConfirmed,
+    COMPLETED:   t.interviewStatusCompleted,
+    CANCELLED:   t.interviewStatusCancelled,
+    RESCHEDULED: t.interviewStatusRescheduled,
   };
 }
 
-function InterviewCard({ interview, c, styles }: { interview: Interview; c: any; styles: any }) {
-  const { date, time } = formatInterviewDate(interview.scheduled_at);
+function formatInterviewDate(iso: string, locale: string) {
+  const d = new Date(iso);
+  return {
+    date: d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+    time: d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+function InterviewCard({ interview, c, styles, t, locale }: { interview: Interview; c: any; styles: any; t: TabsTranslations['applications']; locale: string }) {
+  const { date, time } = formatInterviewDate(interview.scheduled_at, locale);
   const statusColor = INTERVIEW_STATUS_COLOR[interview.status] ?? '#666';
+  const statusLabel = getInterviewStatusLabel(t)[interview.status] ?? interview.status;
   const isVirtual = ['ZOOM', 'GOOGLE_MEET', 'TEAMS', 'OTHER'].includes(interview.platform);
 
   return (
@@ -66,10 +83,10 @@ function InterviewCard({ interview, c, styles }: { interview: Interview; c: any;
       <View style={styles.interviewHeader}>
         <View style={styles.interviewTitleRow}>
           <Ionicons name="calendar-outline" size={14} color="#14A800" />
-          <Text style={styles.interviewTitle}>Interview Scheduled</Text>
+          <Text style={styles.interviewTitle}>{t.interviewScheduledTitle}</Text>
         </View>
         <View style={[styles.interviewStatusBadge, { backgroundColor: statusColor + '18', borderColor: statusColor + '44' }]}>
-          <Text style={[styles.interviewStatusText, { color: statusColor }]}>{interview.status}</Text>
+          <Text style={[styles.interviewStatusText, { color: statusColor }]}>{statusLabel}</Text>
         </View>
       </View>
 
@@ -80,14 +97,14 @@ function InterviewCard({ interview, c, styles }: { interview: Interview; c: any;
 
       <View style={styles.interviewRow}>
         <Ionicons name="hourglass-outline" size={14} color={c.textMuted} />
-        <Text style={styles.interviewDetail}>{interview.duration_min} min · {PLATFORM_LABEL[interview.platform]}</Text>
+        <Text style={styles.interviewDetail}>{interview.duration_min} min · {getPlatformLabel(t)[interview.platform]}</Text>
       </View>
 
       {isVirtual && interview.meeting_link ? (
         <TouchableOpacity style={styles.interviewRow} onPress={() => Linking.openURL(interview.meeting_link!)}>
           <Ionicons name="link-outline" size={14} color="#1565C0" />
           <Text style={[styles.interviewDetail, { color: '#1565C0', textDecorationLine: 'underline' }]} numberOfLines={1}>
-            Join meeting
+            {t.joinMeeting}
           </Text>
         </TouchableOpacity>
       ) : interview.location ? (
@@ -111,12 +128,14 @@ type Filter = 'ALL' | 'ACTIVE' | 'CLOSED';
 const ACTIVE_STATUSES: Status[] = ['PENDING_REVIEW', 'FORWARDED_TO_FIRM', 'REVIEWING', 'SHORTLISTED', 'INTERVIEW'];
 const CLOSED_STATUSES: Status[] = ['OFFER', 'REJECTED'];
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+function formatDate(iso: string, locale: string) {
+  return new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export default function ApplicationsScreen() {
   const { colors: c } = useTheme();
+  const { t, language } = useT();
+  const locale = language === 'fr' ? 'fr-FR' : 'en-GB';
   const styles = useMemo(() => makeStyles(c), [c]);
   const [filter, setFilter] = useState<Filter>('ALL');
 
@@ -127,12 +146,12 @@ export default function ApplicationsScreen() {
 
   const confirmWithdraw = (app: Application) => {
     Alert.alert(
-      'Withdraw application',
-      `Remove your application for "${app.post.title}"?`,
+      t.applications.withdrawAlertTitle,
+      `${t.applications.withdrawAlertMessagePrefix} "${app.post.title}"?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t.applications.withdrawAlertCancel, style: 'cancel' },
         {
-          text: 'Withdraw',
+          text: t.applications.withdrawAlertConfirm,
           style: 'destructive',
           onPress: () => withdraw(app.id),
         },
@@ -155,7 +174,7 @@ export default function ApplicationsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.title}>Applications</Text>
+        <Text style={styles.title}>{t.applications.title}</Text>
         <View style={styles.badge}><Text style={styles.badgeText}>{total}</Text></View>
       </View>
 
@@ -163,7 +182,7 @@ export default function ApplicationsScreen() {
         {(['ALL', 'ACTIVE', 'CLOSED'] as Filter[]).map((f) => (
           <TouchableOpacity key={f} style={[styles.filterChip, filter === f && styles.filterChipActive]} onPress={() => setFilter(f)}>
             <Text style={[styles.filterLabel, filter === f && styles.filterLabelActive]}>
-              {f === 'ALL' ? 'All' : f === 'ACTIVE' ? 'Active' : 'Closed'}
+              {f === 'ALL' ? t.applications.filterAll : f === 'ACTIVE' ? t.applications.filterActive : t.applications.filterClosed}
             </Text>
           </TouchableOpacity>
         ))}
@@ -176,9 +195,9 @@ export default function ApplicationsScreen() {
       ) : isError ? (
         <View style={styles.center}>
           <Ionicons name="cloud-offline-outline" size={48} color={c.border3} />
-          <Text style={styles.emptyText}>Could not load applications</Text>
+          <Text style={styles.emptyText}>{t.applications.loadError}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t.applications.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -193,12 +212,13 @@ export default function ApplicationsScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="document-text-outline" size={52} color={c.border3} />
-              <Text style={styles.emptyText}>No applications yet</Text>
-              <Text style={styles.emptyHint}>Apply to jobs to track them here</Text>
+              <Text style={styles.emptyText}>{t.applications.emptyTitle}</Text>
+              <Text style={styles.emptyHint}>{t.applications.emptyHint}</Text>
             </View>
           }
           renderItem={({ item }: { item: Application }) => {
             const cur = currentStatus(item.status);
+            const STATUS_META = getStatusMeta(t.applications);
             const meta = STATUS_META[cur];
             const firmCity = [item.firm?.city, item.firm?.country].filter(Boolean).join(', ');
             return (
@@ -212,10 +232,10 @@ export default function ApplicationsScreen() {
                     <Ionicons name="business-outline" size={18} color={c.accent} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.firmName}>{item.firm?.name ?? 'Unknown firm'}</Text>
+                    <Text style={styles.firmName}>{item.firm?.name ?? t.applications.unknownFirm}</Text>
                     {firmCity ? <Text style={styles.firmCity}>{firmCity}</Text> : null}
                   </View>
-                  <Text style={styles.appliedDate}>Applied {formatDate(item.createdAt)}</Text>
+                  <Text style={styles.appliedDate}>{t.applications.appliedPrefix} {formatDate(item.createdAt, locale)}</Text>
                 </View>
 
                 <Text style={styles.jobTitle} numberOfLines={2}>{item.post.title}</Text>
@@ -236,7 +256,7 @@ export default function ApplicationsScreen() {
                 </View>
 
                 {item.interview && (
-                  <InterviewCard interview={item.interview} c={c} styles={styles} />
+                  <InterviewCard interview={item.interview} c={c} styles={styles} t={t.applications} locale={locale} />
                 )}
 
                 <View style={styles.cardBottom}>
@@ -257,7 +277,7 @@ export default function ApplicationsScreen() {
                         }}
                       >
                         <Ionicons name="chatbubble-outline" size={13} color={c.accent} />
-                        <Text style={styles.msgBtnText}>Message</Text>
+                        <Text style={styles.msgBtnText}>{t.applications.messageBtn}</Text>
                       </TouchableOpacity>
                     )}
                     {WITHDRAWABLE.includes(cur) && (
@@ -270,7 +290,7 @@ export default function ApplicationsScreen() {
                         disabled={isWithdrawing}
                       >
                         <Ionicons name="trash-outline" size={14} color="#C62828" />
-                        <Text style={styles.withdrawText}>Withdraw</Text>
+                        <Text style={styles.withdrawText}>{t.applications.withdrawBtn}</Text>
                       </TouchableOpacity>
                     )}
                   </View>

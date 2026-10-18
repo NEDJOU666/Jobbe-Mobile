@@ -5,25 +5,27 @@ import { Animated, Dimensions, Image, Pressable, StyleSheet, Text, TouchableOpac
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 
 const DRAWER_WIDTH = Dimensions.get('window').width * 0.78;
 
 interface Props { visible: boolean; onClose: () => void }
 
-const MENU_ITEMS: Array<{ icon: string; label: string; route: string }> = [
-  { icon: 'person-outline',          label: 'Profile',        route: '/profile' },
-  { icon: 'stats-chart-outline',     label: 'My Stats',       route: '/stats' },
-  { icon: 'document-attach-outline', label: 'Documents',      route: '/documents' },
-  { icon: 'wallet-outline',          label: 'Credits',        route: '/credits' },
-  { icon: 'settings-outline',        label: 'Settings',       route: '/settings' },
-  { icon: 'help-circle-outline',     label: 'Help & Support', route: '/help' },
-];
-
 export function DrawerMenu({ visible, onClose }: Props) {
   const { user, logout } = useAuth();
   const { colors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const { t } = useT();
   const insets = useSafeAreaInsets();
+
+  const MENU_ITEMS: Array<{ icon: string; label: string; route: string }> = [
+    { icon: 'person-outline',          label: t.drawerMenu.profileLabel,      route: '/profile' },
+    { icon: 'stats-chart-outline',     label: t.drawerMenu.myStatsLabel,      route: '/stats' },
+    { icon: 'document-attach-outline', label: t.drawerMenu.documentsLabel,    route: '/documents' },
+    { icon: 'wallet-outline',          label: t.drawerMenu.creditsLabel,      route: '/credits' },
+    { icon: 'settings-outline',        label: t.drawerMenu.settingsLabel,     route: '/settings' },
+    { icon: 'help-circle-outline',     label: t.drawerMenu.helpSupportLabel,  route: '/help' },
+  ];
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
@@ -65,8 +67,8 @@ export function DrawerMenu({ visible, onClose }: Props) {
               : <Text style={styles.avatarText}>{initial}</Text>}
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user?.name ?? 'User'}</Text>
-            <Text style={styles.userRole}>Job Seeker</Text>
+            <Text style={styles.userName}>{user?.name ?? t.drawerMenu.defaultUserName}</Text>
+            <Text style={styles.userRole}>{t.drawerMenu.jobSeekerRole}</Text>
           </View>
           {user?.isEmailVerified && <Ionicons name="checkmark-circle" size={20} color={c.accent} />}
         </View>
@@ -87,10 +89,10 @@ export function DrawerMenu({ visible, onClose }: Props) {
 
         <TouchableOpacity style={styles.menuItem} onPress={handleLogout} activeOpacity={0.7}>
           <Ionicons name="log-out-outline" size={20} color="#E53935" />
-          <Text style={[styles.menuLabel, { color: '#E53935' }]}>Log Out</Text>
+          <Text style={[styles.menuLabel, { color: '#E53935' }]}>{t.drawerMenu.logOutLabel}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 1.0.0</Text>
+        <Text style={styles.version}>{t.drawerMenu.versionPrefix}1.0.0</Text>
       </Animated.View>
     </>
   );

@@ -1,6 +1,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 import { api } from '@/lib/api';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -13,6 +14,7 @@ export default function ProfileEditScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { colors: c } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
 
   const { data, isLoading, isError, refetch } = useProfile();
@@ -92,7 +94,7 @@ export default function ProfileEditScreen() {
       setAvatarUrl(data.url);
       updateProfile({ avatar: data.url });
     } catch {
-      Alert.alert('Upload failed', 'Could not upload photo. Please try again.');
+      Alert.alert(t.profileEdit.uploadFailedTitle, t.profileEdit.uploadFailedMessage);
     } finally {
       setUploadingPhoto(false);
     }
@@ -100,7 +102,7 @@ export default function ProfileEditScreen() {
 
   const onSave = () => {
     if (!name.trim()) {
-      Alert.alert('Name required', 'Please enter your name.');
+      Alert.alert(t.profileEdit.nameRequiredTitle, t.profileEdit.nameRequiredMessage);
       return;
     }
     updateProfile(
@@ -121,7 +123,7 @@ export default function ProfileEditScreen() {
       {
         onSuccess: () => router.back(),
         onError: (err: any) => {
-          Alert.alert('Save failed', err?.response?.data?.error ?? 'Could not update profile. Please try again.');
+          Alert.alert(t.profileEdit.saveFailedTitle, err?.response?.data?.error ?? t.profileEdit.saveFailedDefault);
         },
       },
     );
@@ -133,9 +135,9 @@ export default function ProfileEditScreen() {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()} disabled={isSaving}>
           <Ionicons name="close" size={20} color={c.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <Text style={styles.headerTitle}>{t.profileEdit.title}</Text>
         <TouchableOpacity style={[styles.saveBtn, isSaving && { opacity: 0.6 }]} onPress={onSave} disabled={isSaving}>
-          {isSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save</Text>}
+          {isSaving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>{t.profileEdit.save}</Text>}
         </TouchableOpacity>
       </View>
 
@@ -144,9 +146,9 @@ export default function ProfileEditScreen() {
       ) : isError ? (
         <View style={styles.center}>
           <Ionicons name="cloud-offline-outline" size={48} color={c.border3} />
-          <Text style={styles.emptyText}>Could not load profile</Text>
+          <Text style={styles.emptyText}>{t.profileEdit.loadError}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t.profileEdit.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -163,36 +165,36 @@ export default function ProfileEditScreen() {
                 ? <ActivityIndicator color={c.accent} size="small" />
                 : <>
                     <Ionicons name="camera-outline" size={16} color={c.accent} />
-                    <Text style={styles.changePhotoText}>Change photo</Text>
+                    <Text style={styles.changePhotoText}>{t.profileEdit.changePhoto}</Text>
                   </>}
             </TouchableOpacity>
           </View>
 
           {/* Basic info */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Basic Info</Text>
-            <Field c={c} label="Full Name" value={name} onChangeText={setName} placeholder="Your name" />
-            <Field c={c} label="Professional Title" value={headline} onChangeText={setHeadline} placeholder="e.g. React Native Developer" />
-            <Field c={c} label="Location" value={location} onChangeText={setLocation} placeholder="City, Country" />
-            <Field c={c} label="Phone" value={phone} onChangeText={setPhone} placeholder="+237 6XX XXX XXX" keyboardType="phone-pad" />
+            <Text style={styles.cardTitle}>{t.profileEdit.basicInfo}</Text>
+            <Field c={c} label={t.profileEdit.fullName} value={name} onChangeText={setName} placeholder={t.profileEdit.fullNamePlaceholder} />
+            <Field c={c} label={t.profileEdit.professionalTitle} value={headline} onChangeText={setHeadline} placeholder={t.profileEdit.professionalTitlePlaceholder} />
+            <Field c={c} label={t.profileEdit.location} value={location} onChangeText={setLocation} placeholder={t.profileEdit.locationPlaceholder} />
+            <Field c={c} label={t.profileEdit.phone} value={phone} onChangeText={setPhone} placeholder={t.profileEdit.phonePlaceholder} keyboardType="phone-pad" />
           </View>
 
           {/* Online presence */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Online Presence</Text>
-            <Field c={c} label="Website" value={website} onChangeText={setWebsite} placeholder="https://yoursite.com" keyboardType="url" />
-            <Field c={c} label="LinkedIn" value={linkedin} onChangeText={setLinkedin} placeholder="linkedin.com/in/..." keyboardType="url" />
-            <Field c={c} label="GitHub" value={github} onChangeText={setGithub} placeholder="github.com/..." keyboardType="url" />
+            <Text style={styles.cardTitle}>{t.profileEdit.onlinePresence}</Text>
+            <Field c={c} label={t.profileEdit.website} value={website} onChangeText={setWebsite} placeholder={t.profileEdit.websitePlaceholder} keyboardType="url" />
+            <Field c={c} label={t.profileEdit.linkedin} value={linkedin} onChangeText={setLinkedin} placeholder={t.profileEdit.linkedinPlaceholder} keyboardType="url" />
+            <Field c={c} label={t.profileEdit.github} value={github} onChangeText={setGithub} placeholder={t.profileEdit.githubPlaceholder} keyboardType="url" />
           </View>
 
           {/* Bio */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>About Me</Text>
+            <Text style={styles.cardTitle}>{t.profileEdit.aboutMe}</Text>
             <TextInput
               style={[styles.input, styles.textarea]}
               value={bio}
               onChangeText={setBio}
-              placeholder="Tell employers about yourself..."
+              placeholder={t.profileEdit.bioPlaceholder}
               placeholderTextColor={c.textDim}
               multiline
               numberOfLines={5}
@@ -203,13 +205,13 @@ export default function ProfileEditScreen() {
 
           {/* Skills */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Skills</Text>
+            <Text style={styles.cardTitle}>{t.profileEdit.skills}</Text>
             <View style={styles.inputRow}>
               <TextInput
                 style={[styles.input, { flex: 1 }]}
                 value={skillInput}
                 onChangeText={setSkillInput}
-                placeholder="Add a skill..."
+                placeholder={t.profileEdit.addSkillPlaceholder}
                 placeholderTextColor={c.textDim}
                 onSubmitEditing={addSkill}
                 returnKeyType="done"
@@ -230,20 +232,20 @@ export default function ProfileEditScreen() {
 
           {/* Languages */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Languages</Text>
+            <Text style={styles.cardTitle}>{t.profileEdit.languages}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
               <TextInput
                 style={[styles.input, { flex: 1 }]}
                 value={langInput}
                 onChangeText={setLangInput}
-                placeholder="Language"
+                placeholder={t.profileEdit.languagePlaceholder}
                 placeholderTextColor={c.textDim}
               />
               <TextInput
                 style={[styles.input, { flex: 1 }]}
                 value={levelInput}
                 onChangeText={setLevelInput}
-                placeholder="Level (Native…)"
+                placeholder={t.profileEdit.levelPlaceholder}
                 placeholderTextColor={c.textDim}
                 onSubmitEditing={addLanguage}
                 returnKeyType="done"
@@ -267,11 +269,11 @@ export default function ProfileEditScreen() {
 
           {/* Availability */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Availability</Text>
+            <Text style={styles.cardTitle}>{t.profileEdit.availability}</Text>
             <View style={styles.toggleRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.toggleLabel}>Open to Work</Text>
-                <Text style={styles.toggleSub}>Let employers know you&apos;re available</Text>
+                <Text style={styles.toggleLabel}>{t.profileEdit.openToWork}</Text>
+                <Text style={styles.toggleSub}>{t.profileEdit.openToWorkHint}</Text>
               </View>
               <Switch
                 value={openToWork}

@@ -16,12 +16,14 @@ import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { LogoReveal } from '@/components/LogoReveal';
+import { useT } from '@/hooks/useT';
 
 const { height, width } = Dimensions.get('window');
 
 const videoSource = require('../../assets/videos/mobile-landing.mp4');
 
 export default function WelcomeScreen() {
+  const { t } = useT();
   const player = useVideoPlayer(videoSource, (p) => {
     p.loop = true;
     p.muted = true;
@@ -121,11 +123,11 @@ export default function WelcomeScreen() {
       {/* ── Bottom content ── */}
       <View style={styles.bottomContent}>
         <Animated.Text style={[styles.headline, headlineStyle]}>
-          One app,{'\n'}all your opportunities.
+          {t.welcome.headline}
         </Animated.Text>
 
         <Animated.Text style={[styles.subtitle, subtitleStyle]}>
-          Choose an option to get started. You can add{'\n'}another account at any time.
+          {t.welcome.subtitle}
         </Animated.Text>
 
         <View style={styles.btnRow}>
@@ -135,7 +137,7 @@ export default function WelcomeScreen() {
               onPress={() => router.push('/(auth)/sign-up')}
               activeOpacity={0.85}
             >
-              <Text style={styles.btnSignUpText}>Sign Up</Text>
+              <Text style={styles.btnSignUpText}>{t.welcome.signUp}</Text>
             </TouchableOpacity>
           </Animated.View>
 
@@ -145,14 +147,14 @@ export default function WelcomeScreen() {
               onPress={() => router.push('/(auth)/sign-in')}
               activeOpacity={0.85}
             >
-              <Text style={styles.btnLoginText}>Log In</Text>
+              <Text style={styles.btnLoginText}>{t.welcome.logIn}</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
 
         <Animated.View style={[styles.trustRow, subtitleStyle]}>
           <Ionicons name="shield-checkmark-outline" size={13} color="rgba(255,255,255,0.4)" />
-          <Text style={styles.trustText}>Trusted by 2K+ Enterprise & clients worldwide</Text>
+          <Text style={styles.trustText}>{t.welcome.trust}</Text>
         </Animated.View>
       </View>
     </View>

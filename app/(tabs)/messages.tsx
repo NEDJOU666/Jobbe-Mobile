@@ -10,20 +10,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
+import type { TabsTranslations } from '@/i18n/sections/tabs';
 import {
   useInboxThreads, useThreadMessages, useSendMessage,
   type InboxThread,
 } from '@/hooks/useInbox';
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, t: TabsTranslations['messages']) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return t.timeJustNow;
+  if (m < 60) return `${t.timeAgoPrefix}${m}${t.minSuffix}`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return `${t.timeAgoPrefix}${h}${t.hourSuffix}`;
   const d = Math.floor(h / 24);
-  return d === 1 ? 'Yesterday' : `${d}d ago`;
+  return d === 1 ? t.timeYesterday : `${t.timeAgoPrefix}${d}${t.daySuffix}`;
 }
 
 interface ActiveConvo {
@@ -36,6 +38,7 @@ interface ActiveConvo {
 export default function InboxTab() {
   const { user } = useAuth();
   const { colors: c } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [active, setActive] = useState<ActiveConvo | null>(null);
   const [newMsg, setNewMsg] = useState('');
@@ -160,9 +163,9 @@ export default function InboxTab() {
             ) : messages.length === 0 ? (
               <View style={{ alignItems: 'center', paddingTop: 60, gap: 10 }}>
                 <Ionicons name="chatbubble-outline" size={44} color={c.border3} />
-                <Text style={{ color: c.textMuted, fontSize: 14, fontWeight: '600' }}>No messages yet</Text>
+                <Text style={{ color: c.textMuted, fontSize: 14, fontWeight: '600' }}>{t.messages.noMessagesYet}</Text>
                 <Text style={{ color: c.textDim, fontSize: 12, textAlign: 'center', paddingHorizontal: 32 }}>
-                  Start the conversation with {active.firmName}
+                  {t.messages.startConversationWith} {active.firmName}
                 </Text>
               </View>
             ) : (
@@ -179,14 +182,14 @@ export default function InboxTab() {
                     </View>
                     <View style={[styles.msgBubbleWrap, isMe && { alignItems: 'flex-end' }]}>
                       <Text style={[styles.msgSender, isMe && { textAlign: 'right', color: c.textMuted }]}>
-                        {isMe ? 'You' : msg.sender.name}
+                        {isMe ? t.messages.youLabel : msg.sender.name}
                       </Text>
                       <View style={[styles.msgBubble, isMe ? styles.msgBubbleMe : styles.msgBubbleThem]}>
                         <Text style={[styles.msgText, isMe && { color: '#fff' }]}>{msg.body}</Text>
                       </View>
                       <Text style={[styles.msgTime, isMe && { textAlign: 'right' }]}>
-                        {timeAgo(msg.createdAt)}
-                        {msg.readAt && isMe ? <Text style={{ color: c.accent }}> · Read</Text> : null}
+                        {timeAgo(msg.createdAt, t.messages)}
+                        {msg.readAt && isMe ? <Text style={{ color: c.accent }}> · {t.messages.readLabel}</Text> : null}
                       </Text>
                     </View>
                   </View>
@@ -201,7 +204,7 @@ export default function InboxTab() {
               style={styles.input}
               value={newMsg}
               onChangeText={setNewMsg}
-              placeholder={`Message ${active.firmName}…`}
+              placeholder={`${t.messages.messagePlaceholder} ${active.firmName}…`}
               placeholderTextColor={c.textMuted}
               multiline
               returnKeyType="send"
@@ -226,7 +229,7 @@ export default function InboxTab() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.title}>Inbox</Text>
+        <Text style={styles.title}>{t.messages.title}</Text>
         {totalUnread > 0 && (
           <View style={styles.unreadBadge}>
             <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
@@ -241,9 +244,9 @@ export default function InboxTab() {
       ) : threads.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32 }}>
           <Ionicons name="chatbubbles-outline" size={52} color={c.border3} />
-          <Text style={{ color: c.textMuted, fontSize: 16, fontWeight: '600' }}>No messages yet</Text>
+          <Text style={{ color: c.textMuted, fontSize: 16, fontWeight: '600' }}>{t.messages.noMessagesYet}</Text>
           <Text style={{ color: c.textDim, fontSize: 13, textAlign: 'center' }}>
-            Once a recruiter contacts you about your application, conversations will appear here.
+            {t.messages.emptyInboxHint}
           </Text>
         </View>
       ) : (
@@ -274,7 +277,7 @@ export default function InboxTab() {
                     {item.firm.name}
                   </Text>
                   {item.lastMessage && (
-                    <Text style={styles.threadTime}>{timeAgo(item.lastMessage.createdAt)}</Text>
+                    <Text style={styles.threadTime}>{timeAgo(item.lastMessage.createdAt, t.messages)}</Text>
                   )}
                 </View>
                 <Text style={styles.threadPost} numberOfLines={1}>{item.postTitle}</Text>
@@ -283,7 +286,7 @@ export default function InboxTab() {
                     style={[styles.threadPreview, item.unreadCount > 0 && { color: c.textSub, fontWeight: '600' }]}
                     numberOfLines={1}
                   >
-                    {item.lastMessage.senderId === user?.id ? 'You: ' : ''}{item.lastMessage.body}
+                    {item.lastMessage.senderId === user?.id ? t.messages.youPrefix : ''}{item.lastMessage.body}
                   </Text>
                 )}
               </View>

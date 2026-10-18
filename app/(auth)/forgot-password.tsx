@@ -8,11 +8,13 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useAuth } from '@/hooks/useAuth';
+import { useT } from '@/hooks/useT';
 
 type Step = 'email' | 'code' | 'password';
 
 export default function ForgotPasswordScreen() {
   const { forgotPassword, resetPassword, isLoading } = useAuth();
+  const { t } = useT();
 
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
@@ -37,13 +39,13 @@ export default function ForgotPasswordScreen() {
 
   // ── Step 1: send code ────────────────────────────────────────────────────────
   const handleSendCode = async () => {
-    if (!email.trim()) { Alert.alert('Error', 'Please enter your email'); return; }
+    if (!email.trim()) { Alert.alert(t.forgotPassword.errorTitle, t.forgotPassword.enterEmailError); return; }
     try {
       await forgotPassword(email.trim().toLowerCase());
       setStep('code');
       startCooldown();
     } catch {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Alert.alert(t.forgotPassword.errorTitle, t.forgotPassword.genericError);
     }
   };
 
@@ -51,39 +53,39 @@ export default function ForgotPasswordScreen() {
     try {
       await forgotPassword(email.trim().toLowerCase());
       startCooldown();
-      Alert.alert('Sent', 'A new code has been sent to your email.');
+      Alert.alert(t.forgotPassword.sentTitle, t.forgotPassword.codeSentMessage);
     } catch {
-      Alert.alert('Error', 'Failed to resend. Please try again.');
+      Alert.alert(t.forgotPassword.errorTitle, t.forgotPassword.resendFailedError);
     }
   };
 
   // ── Step 2: verify code → go to new password ─────────────────────────────────
   const handleConfirmCode = () => {
-    if (otp.length !== 6) { Alert.alert('Error', 'Please enter the 6-digit code'); return; }
+    if (otp.length !== 6) { Alert.alert(t.forgotPassword.errorTitle, t.forgotPassword.enterCodeError); return; }
     setStep('password');
   };
 
   // ── Step 3: reset password ───────────────────────────────────────────────────
   const handleResetPassword = async () => {
     if (!newPassword || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in both password fields');
+      Alert.alert(t.forgotPassword.errorTitle, t.forgotPassword.fillPasswordsError);
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      Alert.alert(t.forgotPassword.errorTitle, t.forgotPassword.passwordsMismatchError);
       return;
     }
     if (newPassword.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters');
+      Alert.alert(t.forgotPassword.errorTitle, t.forgotPassword.passwordTooShortError);
       return;
     }
     try {
       await resetPassword(email.trim().toLowerCase(), otp, newPassword);
-      Alert.alert('Success', 'Your password has been reset. Please log in.', [
-        { text: 'OK', onPress: () => router.replace('/(auth)/sign-in') },
+      Alert.alert(t.forgotPassword.successTitle, t.forgotPassword.passwordResetMessage, [
+        { text: t.forgotPassword.okButton, onPress: () => router.replace('/(auth)/sign-in') },
       ]);
     } catch (err: any) {
-      Alert.alert('Error', 'Invalid or expired code. Please start over.');
+      Alert.alert(t.forgotPassword.errorTitle, t.forgotPassword.invalidCodeError);
       setStep('email');
       setOtp('');
     }
@@ -130,17 +132,17 @@ export default function ForgotPasswordScreen() {
               </View>
             </View>
 
-            <Text style={styles.title}>Forgot password?</Text>
+            <Text style={styles.title}>{t.forgotPassword.title}</Text>
             <Text style={styles.subtitle}>
-              Enter your email and we'll send you a 6-digit code to reset your password.
+              {t.forgotPassword.subtitle}
             </Text>
 
-            <Text style={styles.fieldLabel}>Email address</Text>
+            <Text style={styles.fieldLabel}>{t.forgotPassword.emailLabel}</Text>
             <View style={[styles.inputWrapper, focused === 'email' && styles.inputFocused]}>
               <Ionicons name="mail-outline" size={18} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Enter your email"
+                placeholder={t.forgotPassword.emailPlaceholder}
                 placeholderTextColor="#555"
                 value={email}
                 onChangeText={setEmail}
@@ -159,14 +161,14 @@ export default function ForgotPasswordScreen() {
               activeOpacity={0.85}
             >
               <Text style={styles.actionBtnText}>
-                {isLoading ? 'Sending...' : 'Send code'}
+                {isLoading ? t.forgotPassword.sendingButton : t.forgotPassword.sendCodeButton}
               </Text>
             </TouchableOpacity>
 
             <View style={styles.backRow}>
               <Ionicons name="arrow-back" size={14} color="#14A800" />
               <TouchableOpacity onPress={() => router.replace('/(auth)/sign-in')}>
-                <Text style={styles.backLink}> Back to Log In</Text>
+                <Text style={styles.backLink}> {t.forgotPassword.backToLogin}</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -181,13 +183,13 @@ export default function ForgotPasswordScreen() {
               </View>
             </View>
 
-            <Text style={styles.title}>Check your email</Text>
+            <Text style={styles.title}>{t.forgotPassword.checkEmailTitle}</Text>
             <Text style={styles.subtitle}>
-              We sent a 6-digit code to{'\n'}
+              {t.forgotPassword.codeSentToPrefix}{'\n'}
               <Text style={styles.emailHighlight}>{email}</Text>
             </Text>
 
-            <Text style={styles.fieldLabel}>Verification code</Text>
+            <Text style={styles.fieldLabel}>{t.forgotPassword.codeLabel}</Text>
             <TextInput
               style={styles.otpInput}
               placeholder="000000"
@@ -205,14 +207,14 @@ export default function ForgotPasswordScreen() {
               onPress={handleConfirmCode}
               activeOpacity={0.85}
             >
-              <Text style={styles.actionBtnText}>Continue</Text>
+              <Text style={styles.actionBtnText}>{t.forgotPassword.continueButton}</Text>
             </TouchableOpacity>
 
             <View style={styles.resendRow}>
-              <Text style={styles.resendText}>Didn't receive it? </Text>
+              <Text style={styles.resendText}>{t.forgotPassword.didntReceiveCode}</Text>
               <TouchableOpacity onPress={handleResend} disabled={resendCooldown > 0 || isLoading}>
                 <Text style={[styles.resendLink, resendCooldown > 0 && styles.resendDisabled]}>
-                  {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend'}
+                  {resendCooldown > 0 ? `${t.forgotPassword.resendCountdownPrefix}${resendCooldown}${t.forgotPassword.resendCountdownSuffix}` : t.forgotPassword.resendButton}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -228,17 +230,17 @@ export default function ForgotPasswordScreen() {
               </View>
             </View>
 
-            <Text style={styles.title}>New password</Text>
+            <Text style={styles.title}>{t.forgotPassword.newPasswordTitle}</Text>
             <Text style={styles.subtitle}>
-              Code verified. Choose a strong new password.
+              {t.forgotPassword.codeVerifiedSubtitle}
             </Text>
 
-            <Text style={styles.fieldLabel}>New password</Text>
+            <Text style={styles.fieldLabel}>{t.forgotPassword.newPasswordLabel}</Text>
             <View style={[styles.inputWrapper, focused === 'password' && styles.inputFocused]}>
               <Ionicons name="lock-closed-outline" size={18} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="At least 8 characters"
+                placeholder={t.forgotPassword.newPasswordPlaceholder}
                 placeholderTextColor="#555"
                 value={newPassword}
                 onChangeText={setNewPassword}
@@ -255,12 +257,12 @@ export default function ForgotPasswordScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.fieldLabel}>Confirm password</Text>
+            <Text style={styles.fieldLabel}>{t.forgotPassword.confirmPasswordLabel}</Text>
             <View style={[styles.inputWrapper, focused === 'confirm' && styles.inputFocused]}>
               <Ionicons name="lock-closed-outline" size={18} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Repeat your password"
+                placeholder={t.forgotPassword.confirmPasswordPlaceholder}
                 placeholderTextColor="#555"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
@@ -278,7 +280,7 @@ export default function ForgotPasswordScreen() {
               activeOpacity={0.85}
             >
               <Text style={styles.actionBtnText}>
-                {isLoading ? 'Resetting...' : 'Reset password'}
+                {isLoading ? t.forgotPassword.resettingButton : t.forgotPassword.resetPasswordButton}
               </Text>
             </TouchableOpacity>
           </Animated.View>

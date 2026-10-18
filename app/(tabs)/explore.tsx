@@ -1,19 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
-
-const UPCOMING = [
-  { icon: 'search', title: 'Job Search', desc: 'Browse thousands of opportunities tailored to your skills.' },
-  { icon: 'flash', title: 'Smart Matching', desc: 'AI-powered recommendations based on your profile.' },
-  { icon: 'document-text', title: 'One-Click Apply', desc: 'Apply to multiple jobs instantly with your saved profile.' },
-  { icon: 'people', title: 'Networking', desc: 'Connect with recruiters and professionals in your field.' },
-] as const;
+import { useT } from '@/hooks/useT';
 
 export default function ExploreScreen() {
+  const { t } = useT();
+
+  const UPCOMING = [
+    { icon: 'search', title: t.explore.jobSearchTitle, desc: t.explore.jobSearchDesc },
+    { icon: 'flash', title: t.explore.smartMatchingTitle, desc: t.explore.smartMatchingDesc },
+    { icon: 'document-text', title: t.explore.oneClickApplyTitle, desc: t.explore.oneClickApplyDesc },
+    { icon: 'people', title: t.explore.networkingTitle, desc: t.explore.networkingDesc },
+  ] as const;
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        <Text style={styles.eyebrow}>WHAT'S COMING</Text>
-        <Text style={styles.title}>Built for your{'\n'}career growth</Text>
+        <Text style={styles.eyebrow}>{t.explore.eyebrow}</Text>
+        <Text style={styles.title}>{t.explore.title}</Text>
 
         <View style={styles.list}>
           {UPCOMING.map((item, i) => (
@@ -26,7 +29,7 @@ export default function ExploreScreen() {
                 <Text style={styles.cardDesc}>{item.desc}</Text>
               </View>
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>Soon</Text>
+                <Text style={styles.badgeText}>{t.explore.badgeSoon}</Text>
               </View>
             </View>
           ))}

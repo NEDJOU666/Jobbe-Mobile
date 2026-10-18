@@ -3,6 +3,7 @@ import { useDocuments } from '@/hooks/useDocuments';
 import { useProfile } from '@/hooks/useProfile';
 import { useStats } from '@/hooks/useStats';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
@@ -37,6 +38,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const { colors: c, isDark, toggle } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const qc = useQueryClient();
 
@@ -45,7 +47,7 @@ export default function ProfileScreen() {
   const { data: docs } = useDocuments();
   const profile = data?.profile ?? null;
 
-  const displayName = data?.name ?? user?.name ?? 'User';
+  const displayName = data?.name ?? user?.name ?? t.profile.defaultUserName;
   const displayEmail = data?.email ?? user?.email ?? '—';
   const avatarUri = (data as any)?.profile_image ?? (data as any)?.avatar ?? null;
   const initial = displayName.charAt(0).toUpperCase();
@@ -53,10 +55,10 @@ export default function ProfileScreen() {
   const resumes = docs?.filter((d) => d.documentType === 'RESUME') ?? [];
 
   const handleLogout = () => {
-    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t.profile.signOutTitle, t.profile.signOutMessage, [
+      { text: t.profile.cancel, style: 'cancel' },
       {
-        text: 'Sign out', style: 'destructive',
+        text: t.profile.signOutTitle, style: 'destructive',
         onPress: async () => { await logout(); qc.clear(); },
       },
     ]);
@@ -74,7 +76,7 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={c.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Profile</Text>
+        <Text style={styles.headerTitle}>{t.profile.title}</Text>
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/profile-edit')}>
           <Ionicons name="create-outline" size={20} color={c.text} />
         </TouchableOpacity>
@@ -85,9 +87,9 @@ export default function ProfileScreen() {
       ) : isError ? (
         <View style={styles.center}>
           <Ionicons name="cloud-offline-outline" size={48} color={c.border3} />
-          <Text style={styles.emptyText}>Could not load profile</Text>
+          <Text style={styles.emptyText}>{t.profile.loadError}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t.profile.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -114,32 +116,32 @@ export default function ProfileScreen() {
             ) : null}
             <View style={styles.completionCard}>
               <View style={styles.completionTop}>
-                <Text style={styles.completionLabel}>Profile completion</Text>
+                <Text style={styles.completionLabel}>{t.profile.profileCompletion}</Text>
                 <Text style={styles.completionPct}>{completion}%</Text>
               </View>
               <View style={styles.progressBg}>
                 <View style={[styles.progressFill, { width: `${completion}%` }]} />
               </View>
               {completion < 100 && (
-                <Text style={styles.completionHint}>Complete your profile to stand out to recruiters</Text>
+                <Text style={styles.completionHint}>{t.profile.completionHint}</Text>
               )}
             </View>
           </View>
 
           {profile?.bio ? (
-            <Section c={c} title="About me">
+            <Section c={c} title={t.profile.aboutMe}>
               <Text style={styles.bodyText}>{profile.bio}</Text>
             </Section>
           ) : null}
 
-          <Section c={c} title="Contact">
+          <Section c={c} title={t.profile.contact}>
             <InfoRow c={c} icon="mail-outline" value={displayEmail} />
             {data?.phone ? <InfoRow c={c} icon="call-outline" value={data.phone} /> : null}
             {profile?.location ? <InfoRow c={c} icon="location-outline" value={profile.location} /> : null}
           </Section>
 
           {skills.length > 0 && (
-            <Section c={c} title="Skills">
+            <Section c={c} title={t.profile.skills}>
               <View style={styles.chipGrid}>
                 {skills.map((s) => (
                   <View key={s} style={styles.chip}><Text style={styles.chipText}>{s}</Text></View>
@@ -149,7 +151,7 @@ export default function ProfileScreen() {
           )}
 
           {languages.length > 0 && (
-            <Section c={c} title="Languages">
+            <Section c={c} title={t.profile.languages}>
               {languages.map((raw) => {
                 const { lang, level } = parseLang(raw);
                 return (
@@ -163,7 +165,7 @@ export default function ProfileScreen() {
           )}
 
           {experience.length > 0 && (
-            <Section c={c} title="Work Experience">
+            <Section c={c} title={t.profile.workExperience}>
               {experience.map((exp, i) => (
                 <View key={i} style={[styles.timelineItem, i < experience.length - 1 && styles.timelineItemBorder]}>
                   <View style={styles.timelineDot} />
@@ -178,7 +180,7 @@ export default function ProfileScreen() {
           )}
 
           {education.length > 0 && (
-            <Section c={c} title="Education">
+            <Section c={c} title={t.profile.education}>
               {education.map((edu, i) => (
                 <View key={i} style={styles.timelineItem}>
                   <View style={styles.timelineDot} />
@@ -192,12 +194,12 @@ export default function ProfileScreen() {
           )}
 
           {/* Stats */}
-          <Section c={c} title="My Stats">
+          <Section c={c} title={t.profile.myStats}>
             <View style={styles.statsRow}>
               {[
-                { label: 'Applied',    value: stats?.applied    ?? 0, icon: 'document-text-outline', color: '#1565C0' },
-                { label: 'Interviews', value: stats?.interviews ?? 0, icon: 'videocam-outline',       color: '#6A1B9A' },
-                { label: 'Offers',     value: stats?.offers     ?? 0, icon: 'trophy-outline',         color: c.accent },
+                { label: t.profile.statApplied,    value: stats?.applied    ?? 0, icon: 'document-text-outline', color: '#1565C0' },
+                { label: t.profile.statInterviews, value: stats?.interviews ?? 0, icon: 'videocam-outline',       color: '#6A1B9A' },
+                { label: t.profile.statOffers,     value: stats?.offers     ?? 0, icon: 'trophy-outline',         color: c.accent },
               ].map((s) => (
                 <View key={s.label} style={styles.statCard}>
                   <View style={[styles.statIcon, { backgroundColor: s.color + '18' }]}>
@@ -211,17 +213,17 @@ export default function ProfileScreen() {
           </Section>
 
           {/* Documents */}
-          <Section c={c} title="Résumés & Documents">
+          <Section c={c} title={t.profile.documents}>
             {resumes.length === 0 ? (
               <View style={{ alignItems: 'center', paddingVertical: 12, gap: 6 }}>
                 <Ionicons name="document-outline" size={32} color={c.border3} />
-                <Text style={{ color: c.textMuted, fontSize: 13 }}>No résumé uploaded</Text>
+                <Text style={{ color: c.textMuted, fontSize: 13 }}>{t.profile.noResume}</Text>
                 <TouchableOpacity
                   style={[styles.outlineBtn, { marginTop: 4 }]}
                   onPress={() => router.push('/documents')}
                 >
                   <Ionicons name="add-circle-outline" size={16} color={c.accent} />
-                  <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600' }}>Upload résumé</Text>
+                  <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600' }}>{t.profile.uploadResume}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -237,7 +239,7 @@ export default function ProfileScreen() {
                     </View>
                     {doc.isDefault && (
                       <View style={styles.defaultBadge}>
-                        <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700' }}>Default</Text>
+                        <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700' }}>{t.profile.defaultBadge}</Text>
                       </View>
                     )}
                   </View>
@@ -247,20 +249,20 @@ export default function ProfileScreen() {
                   onPress={() => router.push('/documents')}
                 >
                   <Ionicons name="folder-open-outline" size={16} color={c.accent} />
-                  <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600' }}>Manage documents</Text>
+                  <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600' }}>{t.profile.manageDocuments}</Text>
                 </TouchableOpacity>
               </>
             )}
           </Section>
 
           {/* App Settings */}
-          <Section c={c} title="App Settings">
+          <Section c={c} title={t.profile.appSettings}>
             <View style={styles.settingRow}>
               <View style={styles.settingLeft}>
                 <View style={[styles.settingIcon, { backgroundColor: '#33333318' }]}>
                   <Ionicons name={isDark ? 'moon' : 'sunny-outline'} size={18} color={c.icon} />
                 </View>
-                <Text style={styles.settingLabel}>Dark Mode</Text>
+                <Text style={styles.settingLabel}>{t.profile.darkMode}</Text>
               </View>
               <Switch
                 value={isDark}
@@ -275,7 +277,7 @@ export default function ProfileScreen() {
                 <View style={[styles.settingIcon, { backgroundColor: '#C6282818' }]}>
                   <Ionicons name="log-out-outline" size={18} color="#C62828" />
                 </View>
-                <Text style={[styles.settingLabel, { color: '#C62828' }]}>Sign Out</Text>
+                <Text style={[styles.settingLabel, { color: '#C62828' }]}>{t.profile.signOut}</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
             </TouchableOpacity>

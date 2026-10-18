@@ -7,31 +7,33 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
+import { useT } from '@/hooks/useT';
 
 export default function VerifyOtpScreen() {
   const { verifyEmail, sendVerificationOtp, isLoading } = useAuth();
+  const { t } = useT();
   const [otp, setOtp] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const handleVerify = async () => {
     if (otp.length !== 6) {
-      Alert.alert('Error', 'Please enter a 6-digit code');
+      Alert.alert(t.verifyOtp.errorTitle, t.verifyOtp.enterCodeError);
       return;
     }
     try {
       await verifyEmail(otp);
-      Alert.alert('Success', 'Email verified!', [
-        { text: 'OK', onPress: () => router.replace('/onboarding' as any) }
+      Alert.alert(t.verifyOtp.successTitle, t.verifyOtp.emailVerifiedMessage, [
+        { text: t.verifyOtp.okButton, onPress: () => router.replace('/onboarding' as any) }
       ]);
     } catch (err: any) {
-      Alert.alert('Verification Failed', 'Invalid code. Please try again.');
+      Alert.alert(t.verifyOtp.verificationFailedTitle, t.verifyOtp.invalidCodeError);
     }
   };
 
   const handleResend = async () => {
     try {
       await sendVerificationOtp();
-      Alert.alert('Success', 'Code sent to your email');
+      Alert.alert(t.verifyOtp.successTitle, t.verifyOtp.codeSentMessage);
       setResendCooldown(60);
       const timer = setInterval(() => {
         setResendCooldown((prev) => {
@@ -43,7 +45,7 @@ export default function VerifyOtpScreen() {
         });
       }, 1000);
     } catch (err: any) {
-      Alert.alert('Error', 'Failed to send code. Please try again.');
+      Alert.alert(t.verifyOtp.errorTitle, t.verifyOtp.resendFailedError);
     }
   };
 
@@ -81,15 +83,15 @@ export default function VerifyOtpScreen() {
 
         {/* Title */}
         <Animated.View entering={FadeInDown.delay(220).duration(500)}>
-          <Text style={styles.title}>Verify your email</Text>
+          <Text style={styles.title}>{t.verifyOtp.title}</Text>
           <Text style={styles.subtitle}>
-            We sent a 6-digit code to your email address. Enter it below to verify.
+            {t.verifyOtp.subtitle}
           </Text>
         </Animated.View>
 
         {/* OTP Input */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <Text style={styles.fieldLabel}>Verification code</Text>
+          <Text style={styles.fieldLabel}>{t.verifyOtp.codeLabel}</Text>
           <TextInput
             style={styles.otpInput}
             placeholder="000000"
@@ -111,14 +113,14 @@ export default function VerifyOtpScreen() {
             activeOpacity={0.85}
           >
             <Text style={styles.verifyBtnText}>
-              {isLoading ? 'Verifying...' : 'Verify'}
+              {isLoading ? t.verifyOtp.verifyingButton : t.verifyOtp.verifyButton}
             </Text>
           </TouchableOpacity>
         </Animated.View>
 
         {/* Resend */}
         <Animated.View entering={FadeInDown.delay(450).duration(500)} style={styles.resendRow}>
-          <Text style={styles.resendText}>Didn't receive the code? </Text>
+          <Text style={styles.resendText}>{t.verifyOtp.didntReceiveCode}</Text>
           <TouchableOpacity
             onPress={handleResend}
             disabled={resendCooldown > 0 || isLoading}
@@ -127,7 +129,7 @@ export default function VerifyOtpScreen() {
               styles.resendLink,
               (resendCooldown > 0 || isLoading) && styles.resendDisabled
             ]}>
-              {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend'}
+              {resendCooldown > 0 ? `${t.verifyOtp.resendCountdownPrefix}${resendCooldown}${t.verifyOtp.resendCountdownSuffix}` : t.verifyOtp.resendButton}
             </Text>
           </TouchableOpacity>
         </Animated.View>

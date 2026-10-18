@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { memo, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 import { fs, sp, isSmall } from '@/lib/scale';
 
 export interface Job {
@@ -17,18 +18,14 @@ export interface Job {
   createdAt: string; isSaved?: boolean;
 }
 
-const EMP: Record<string, string> = { FULL_TIME: 'Full-time', PART_TIME: 'Part-time', CONTRACT: 'Contract', INTERNSHIP: 'Internship' };
-const LOC: Record<string, string> = { REMOTE: 'Remote', ONSITE: 'On-site', HYBRID: 'Hybrid' };
-const LVL: Record<string, string> = { JUNIOR: 'Junior', MID: 'Mid-level', SENIOR: 'Senior', STUDENT: 'Student' };
-
-function timeAgo(iso: string) {
+function timeAgo(iso: string, t: any) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return `${m}${t.jobCard.minutesAgoSuffix}`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return `${h}${t.jobCard.hoursAgoSuffix}`;
   const d = Math.floor(h / 24);
-  return d === 1 ? 'Yesterday' : `${d}d ago`;
+  return d === 1 ? t.jobCard.yesterday : `${d}${t.jobCard.daysAgoSuffix}`;
 }
 
 interface Props {
@@ -42,11 +39,16 @@ const HIT = { top: 10, bottom: 10, left: 10, right: 10 };
 function JobCardInner({ job, onPress, onSave, onHide }: Props) {
   const { colors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const { t } = useT();
   const [saved, setSaved] = useState(job.isSaved ?? false);
   const [expanded, setExpanded] = useState(false);
   const [hidden, setHidden] = useState(false);
 
   if (hidden) return null;
+
+  const EMP: Record<string, string> = { FULL_TIME: t.jobCard.employmentFullTime, PART_TIME: t.jobCard.employmentPartTime, CONTRACT: t.jobCard.employmentContract, INTERNSHIP: t.jobCard.employmentInternship };
+  const LOC: Record<string, string> = { REMOTE: t.jobCard.locationRemote, ONSITE: t.jobCard.locationOnsite, HYBRID: t.jobCard.locationHybrid };
+  const LVL: Record<string, string> = { JUNIOR: t.jobCard.levelJunior, MID: t.jobCard.levelMid, SENIOR: t.jobCard.levelSenior, STUDENT: t.jobCard.levelStudent };
 
   const { salaryMin, salaryMax, currency = 'XAF', skills = [], experienceLevel } = job.properties ?? {};
 
@@ -72,7 +74,7 @@ function JobCardInner({ job, onPress, onSave, onHide }: Props) {
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.92}>
       <View style={styles.row}>
         <Text style={styles.meta}>
-          {timeAgo(job.createdAt)}{(job._count?.applications ?? job.applicationCount) != null ? `  ·  ${job._count?.applications ?? job.applicationCount} applied` : ''}
+          {timeAgo(job.createdAt, t)}{(job._count?.applications ?? job.applicationCount) != null ? `  ·  ${job._count?.applications ?? job.applicationCount}${t.jobCard.appliedCountSuffix}` : ''}
         </Text>
         <View style={styles.actions}>
           <TouchableOpacity style={styles.actionBtn} onPress={() => { setHidden(true); onHide?.(job.id); }} hitSlop={HIT}>
@@ -90,7 +92,7 @@ function JobCardInner({ job, onPress, onSave, onHide }: Props) {
       <Text style={styles.desc} numberOfLines={expanded ? undefined : 2}>{job.description}</Text>
       {job.description.length > 100 && (
         <TouchableOpacity onPress={() => setExpanded(!expanded)} hitSlop={HIT}>
-          <Text style={styles.more}>{expanded ? 'less' : 'more'}</Text>
+          <Text style={styles.more}>{expanded ? t.jobCard.lessLabel : t.jobCard.moreLabel}</Text>
         </TouchableOpacity>
       )}
 
@@ -115,12 +117,12 @@ function JobCardInner({ job, onPress, onSave, onHide }: Props) {
         {(job.firm.isVerified || job.firm.status === 'VERIFIED') && (
           <View style={styles.verifiedBadge}>
             <Ionicons name="checkmark-circle" size={12} color={c.accent} />
-            <Text style={styles.verifiedText}>Verified</Text>
+            <Text style={styles.verifiedText}>{t.jobCard.verifiedBadge}</Text>
           </View>
         )}
         <View style={[styles.typeTag, job.postType === 'INTERNSHIP' && styles.typeTagIntern]}>
           <Text style={[styles.typeTagText, job.postType === 'INTERNSHIP' && styles.typeTagTextIntern]}>
-            {job.postType === 'JOB' ? 'Job' : 'Internship'}
+            {job.postType === 'JOB' ? t.jobCard.jobTypeTag : t.jobCard.internshipTypeTag}
           </Text>
         </View>
       </View>

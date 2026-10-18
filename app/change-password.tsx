@@ -1,5 +1,6 @@
 import { api } from '@/lib/api';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -12,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function ChangePasswordScreen() {
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
 
   const [current, setCurrent] = useState('');
@@ -31,13 +33,13 @@ export default function ChangePasswordScreen() {
     setSaving(true);
     try {
       await api.patch('/auth/change-password', { currentPassword: current, newPassword: next });
-      Alert.alert('Password updated', 'Your password has been changed successfully.', [
-        { text: 'OK', onPress: () => router.back() },
+      Alert.alert(t.changePassword.successTitle, t.changePassword.successMessage, [
+        { text: t.changePassword.ok, onPress: () => router.back() },
       ]);
     } catch (err: any) {
       const raw = err?.response?.data?.message;
-      const msg = Array.isArray(raw) ? raw.join('\n') : (raw ?? 'Failed to update password.');
-      Alert.alert('Error', String(msg));
+      const msg = Array.isArray(raw) ? raw.join('\n') : (raw ?? t.changePassword.errorDefault);
+      Alert.alert(t.changePassword.errorTitle, String(msg));
     } finally {
       setSaving(false);
     }
@@ -52,7 +54,7 @@ export default function ChangePasswordScreen() {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={c.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Change Password</Text>
+        <Text style={styles.headerTitle}>{t.changePassword.title}</Text>
         <View style={{ width: 38 }} />
       </View>
 
@@ -65,24 +67,24 @@ export default function ChangePasswordScreen() {
           <Ionicons name="lock-closed-outline" size={32} color={c.accent} />
         </View>
         <Text style={styles.desc}>
-          Enter your current password then choose a strong new one (at least 8 characters).
+          {t.changePassword.description}
         </Text>
 
         <FieldRow
-          label="Current password" value={current} onChange={setCurrent}
+          label={t.changePassword.currentPassword} value={current} onChange={setCurrent}
           show={showCurrent} onToggle={() => setShowCurrent((v) => !v)} c={c} styles={styles}
         />
         <FieldRow
-          label="New password" value={next} onChange={setNext}
+          label={t.changePassword.newPassword} value={next} onChange={setNext}
           show={showNext} onToggle={() => setShowNext((v) => !v)} c={c} styles={styles}
         />
-        {tooShort && <Text style={styles.hint}>At least 8 characters required</Text>}
+        {tooShort && <Text style={styles.hint}>{t.changePassword.tooShortHint}</Text>}
 
         <FieldRow
-          label="Confirm new password" value={confirm} onChange={setConfirm}
+          label={t.changePassword.confirmPassword} value={confirm} onChange={setConfirm}
           show={showConfirm} onToggle={() => setShowConfirm((v) => !v)} c={c} styles={styles}
         />
-        {mismatch && <Text style={[styles.hint, styles.hintError]}>Passwords do not match</Text>}
+        {mismatch && <Text style={[styles.hint, styles.hintError]}>{t.changePassword.mismatchHint}</Text>}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -94,7 +96,7 @@ export default function ChangePasswordScreen() {
         >
           {saving
             ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={styles.saveBtnText}>Update Password</Text>}
+            : <Text style={styles.saveBtnText}>{t.changePassword.updateButton}</Text>}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

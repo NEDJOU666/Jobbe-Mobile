@@ -6,6 +6,7 @@ import {
   type UserDocument,
 } from '@/hooks/useDocuments';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
@@ -18,9 +19,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type DocType = 'RESUME' | 'COVER_LETTER' | 'CERTIFICATE' | 'OTHER';
 
-const TYPE_LABEL: Record<DocType, string> = {
-  RESUME: 'Resume', COVER_LETTER: 'Cover Letter', CERTIFICATE: 'Certificate', OTHER: 'Other',
-};
 const TYPE_COLOR: Record<DocType, string> = {
   RESUME: '#14A800', COVER_LETTER: '#1565C0', CERTIFICATE: '#F57F17', OTHER: '#555',
 };
@@ -32,8 +30,16 @@ function formatDate(iso: string) {
 export default function DocumentsScreen() {
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [filter, setFilter] = useState<DocType | 'ALL'>('ALL');
+
+  const TYPE_LABEL: Record<DocType, string> = {
+    RESUME: t.documents.typeResume,
+    COVER_LETTER: t.documents.typeCoverLetter,
+    CERTIFICATE: t.documents.typeCertificate,
+    OTHER: t.documents.typeOther,
+  };
 
   const { data: docs = [], isLoading, isError, refetch } = useDocuments();
   const { mutate: setDefault } = useSetDefaultDocument();
@@ -45,11 +51,11 @@ export default function DocumentsScreen() {
 
   const confirmDelete = (doc: UserDocument) => {
     Alert.alert(
-      'Delete document',
-      `Remove "${doc.name}"?`,
+      t.documents.deleteDocumentTitle,
+      `${t.documents.removePrefix}${doc.name}${t.documents.removeSuffix}`,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteDoc(doc.id) },
+        { text: t.documents.cancel, style: 'cancel' },
+        { text: t.documents.delete, style: 'destructive', onPress: () => deleteDoc(doc.id) },
       ],
     );
   };
@@ -76,8 +82,8 @@ export default function DocumentsScreen() {
       },
       {
         onError: (err: any) => {
-          const msg = err?.response?.data?.message ?? 'Upload failed. Please try again.';
-          Alert.alert('Upload failed', msg);
+          const msg = err?.response?.data?.message ?? t.documents.uploadFailedDefault;
+          Alert.alert(t.documents.uploadFailedTitle, msg);
         },
       },
     );
@@ -85,14 +91,14 @@ export default function DocumentsScreen() {
 
   const promptDocType = () => {
     Alert.alert(
-      'Document type',
-      'What type of document are you uploading?',
+      t.documents.docTypeTitle,
+      t.documents.docTypeMessage,
       [
-        { text: 'Resume',       onPress: () => handleUpload('RESUME') },
-        { text: 'Cover Letter', onPress: () => handleUpload('COVER_LETTER') },
-        { text: 'Certificate',  onPress: () => handleUpload('CERTIFICATE') },
-        { text: 'Other',        onPress: () => handleUpload('OTHER') },
-        { text: 'Cancel', style: 'cancel' },
+        { text: t.documents.typeResume,       onPress: () => handleUpload('RESUME') },
+        { text: t.documents.typeCoverLetter, onPress: () => handleUpload('COVER_LETTER') },
+        { text: t.documents.typeCertificate,  onPress: () => handleUpload('CERTIFICATE') },
+        { text: t.documents.typeOther,        onPress: () => handleUpload('OTHER') },
+        { text: t.documents.cancel, style: 'cancel' },
       ],
     );
   };
@@ -103,7 +109,7 @@ export default function DocumentsScreen() {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={c.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Documents</Text>
+        <Text style={styles.headerTitle}>{t.documents.title}</Text>
         <TouchableOpacity style={styles.iconBtn} onPress={promptDocType} disabled={isUploading}>
           {isUploading
             ? <ActivityIndicator size="small" color={c.accent} />
@@ -120,7 +126,7 @@ export default function DocumentsScreen() {
               onPress={() => setFilter(f)}
             >
               <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
-                {f === 'ALL' ? 'All' : TYPE_LABEL[f as DocType]}
+                {f === 'ALL' ? t.documents.all : TYPE_LABEL[f as DocType]}
               </Text>
             </TouchableOpacity>
           ))}
@@ -132,9 +138,9 @@ export default function DocumentsScreen() {
       ) : isError ? (
         <View style={styles.center}>
           <Ionicons name="cloud-offline-outline" size={48} color={c.border3} />
-          <Text style={styles.emptyText}>Could not load documents</Text>
+          <Text style={styles.emptyText}>{t.documents.loadError}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t.documents.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -143,13 +149,13 @@ export default function DocumentsScreen() {
             {isUploading ? (
               <>
                 <ActivityIndicator color={c.accent} />
-                <Text style={styles.uploadTitle}>Uploading…</Text>
+                <Text style={styles.uploadTitle}>{t.documents.uploading}</Text>
               </>
             ) : (
               <>
                 <Ionicons name="cloud-upload-outline" size={28} color={c.accent} />
-                <Text style={styles.uploadTitle}>Upload document</Text>
-                <Text style={styles.uploadHint}>PDF, DOC · Max 10 MB</Text>
+                <Text style={styles.uploadTitle}>{t.documents.uploadDocument}</Text>
+                <Text style={styles.uploadHint}>{t.documents.uploadHint}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -157,7 +163,7 @@ export default function DocumentsScreen() {
           {filtered.length === 0 ? (
             <View style={styles.empty}>
               <Ionicons name="document-outline" size={48} color={c.border3} />
-              <Text style={styles.emptyText}>No documents</Text>
+              <Text style={styles.emptyText}>{t.documents.noDocuments}</Text>
             </View>
           ) : (
             filtered.map((doc) => {
@@ -173,7 +179,7 @@ export default function DocumentsScreen() {
                       <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
                       {doc.isDefault && (
                         <View style={styles.defaultBadge}>
-                          <Text style={styles.defaultText}>Default</Text>
+                          <Text style={styles.defaultText}>{t.documents.defaultBadge}</Text>
                         </View>
                       )}
                     </View>

@@ -14,13 +14,14 @@ const getNotifications = () => require('expo-notifications') as typeof import('e
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
-
-
+import { useT } from '@/hooks/useT';
+import type { Language } from '@/i18n/translations';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { logout } = useAuth();
   const { colors: c, isDark, toggle } = useTheme();
+  const { t, language, setLanguage } = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
 
   const { data: profileData } = useProfile();
@@ -56,21 +57,21 @@ export default function SettingsScreen() {
       setPushGranted(status === 'granted');
       if (status !== 'granted') {
         Alert.alert(
-          'Permission required',
-          'Enable notifications in your device settings to receive job alerts.',
+          t.settings.permissionRequiredTitle,
+          t.settings.permissionRequiredMessage,
           [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            { text: t.settings.cancel, style: 'cancel' },
+            { text: t.settings.openSettings, onPress: () => Linking.openSettings() },
           ],
         );
       }
     } else {
       Alert.alert(
-        'Turn off notifications',
-        'To disable notifications, go to your device settings.',
+        t.settings.turnOffNotificationsTitle,
+        t.settings.turnOffNotificationsMessage,
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          { text: t.settings.cancel, style: 'cancel' },
+          { text: t.settings.openSettings, onPress: () => Linking.openSettings() },
         ],
       );
     }
@@ -95,10 +96,10 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Sign out', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t.settings.signOutTitle, t.settings.signOutMessage, [
+      { text: t.settings.cancel, style: 'cancel' },
       {
-        text: 'Sign out', style: 'destructive',
+        text: t.settings.signOut, style: 'destructive',
         onPress: async () => { await logout(); router.replace('/(auth)/welcome'); },
       },
     ]);
@@ -106,17 +107,25 @@ export default function SettingsScreen() {
 
   const handleChangeEmail = () => {
     Alert.alert(
-      'Change Email',
-      'To change your email address, contact our support team.',
+      t.settings.changeEmailTitle,
+      t.settings.changeEmailMessage,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Contact Support', onPress: () => Linking.openURL('mailto:Help-support@oxbiy.com') },
+        { text: t.settings.cancel, style: 'cancel' },
+        { text: t.settings.contactSupport, onPress: () => Linking.openURL('mailto:Help-support@oxbiy.com') },
       ],
     );
   };
 
   const handleRateApp = () =>
-    Alert.alert('Coming Soon', 'JobFinder will be available on the Play Store and App Store soon. Thank you for your support!');
+    Alert.alert(t.settings.comingSoonTitle, t.settings.comingSoonMessage);
+
+  const handleLanguagePicker = () => {
+    Alert.alert(t.settings.languageTitle, t.settings.languageMessage, [
+      { text: t.settings.cancel, style: 'cancel' },
+      { text: 'English', onPress: () => setLanguage('en' as Language) },
+      { text: 'Français', onPress: () => setLanguage('fr' as Language) },
+    ]);
+  };
 
   const openWebview = (url: string, title: string) => {
     router.push(`/webview?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}` as any);
@@ -128,20 +137,20 @@ export default function SettingsScreen() {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={c.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{t.settings.title}</Text>
         <View style={{ width: 38 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
         {/* ── Appearance ── */}
-        <GroupTitle c={c} label="Appearance" />
+        <GroupTitle c={c} label={t.settings.appearance} />
         <View style={styles.groupCard}>
           <View style={styles.toggleRow}>
             <View style={[styles.rowIcon, { backgroundColor: c.accentBg }]}>
               <Ionicons name={isDark ? 'moon' : 'sunny'} size={18} color={c.accent} />
             </View>
-            <Text style={styles.rowLabel}>Dark Mode</Text>
+            <Text style={styles.rowLabel}>{t.settings.darkMode}</Text>
             <Switch
               value={isDark}
               onValueChange={toggle}
@@ -149,54 +158,57 @@ export default function SettingsScreen() {
               thumbColor={isDark ? c.accent : c.textMuted}
             />
           </View>
+          <SettingRow c={c} icon="language-outline" label={t.settings.language}
+            value={language === 'fr' ? 'Français' : 'English'}
+            onPress={handleLanguagePicker} last />
         </View>
 
         {/* ── Account ── */}
-        <GroupTitle c={c} label="Account" />
+        <GroupTitle c={c} label={t.settings.account} />
         <View style={styles.groupCard}>
-          <SettingRow c={c} icon="person-outline" label="Edit Profile"
+          <SettingRow c={c} icon="person-outline" label={t.settings.editProfile}
             onPress={() => router.push('/profile-edit')} />
-          <SettingRow c={c} icon="lock-closed-outline" label="Change Password"
+          <SettingRow c={c} icon="lock-closed-outline" label={t.settings.changePassword}
             onPress={() => router.push('/change-password')} />
-          <SettingRow c={c} icon="mail-outline" label="Change Email"
+          <SettingRow c={c} icon="mail-outline" label={t.settings.changeEmail}
             onPress={handleChangeEmail} last />
         </View>
 
         {/* ── Privacy ── */}
-        <GroupTitle c={c} label="Privacy" />
+        <GroupTitle c={c} label={t.settings.privacy} />
         <View style={styles.groupCard}>
-          <ToggleRow c={c} icon="eye-outline" label="Profile visible to recruiters"
+          <ToggleRow c={c} icon="eye-outline" label={t.settings.profileVisible}
             value={profileVisible} onToggle={handleProfileVisible} />
-          <ToggleRow c={c} icon="cash-outline" label="Show salary expectations"
+          <ToggleRow c={c} icon="cash-outline" label={t.settings.showSalary}
             value={showSalary} onToggle={handleShowSalary} />
-          <ToggleRow c={c} icon="briefcase-outline" label="Open to work"
+          <ToggleRow c={c} icon="briefcase-outline" label={t.settings.openToWork}
             value={openToWork} onToggle={handleOpenToWork} last />
         </View>
 
         {/* ── Notifications ── */}
-        <GroupTitle c={c} label="Notifications" />
+        <GroupTitle c={c} label={t.settings.notifications} />
         <View style={styles.groupCard}>
-          <ToggleRow c={c} icon="mail-outline" label="Email job alerts"
+          <ToggleRow c={c} icon="mail-outline" label={t.settings.emailJobAlerts}
             value={emailAlerts} onToggle={handleEmailAlerts} />
-          <ToggleRow c={c} icon="notifications-outline" label="Push notifications"
+          <ToggleRow c={c} icon="notifications-outline" label={t.settings.pushNotifications}
             value={pushGranted} onToggle={handlePushToggle} last />
         </View>
 
         {/* ── Support ── */}
-        <GroupTitle c={c} label="Support" />
+        <GroupTitle c={c} label={t.settings.support} />
         <View style={styles.groupCard}>
-          <SettingRow c={c} icon="help-circle-outline" label="Help & Support"
+          <SettingRow c={c} icon="help-circle-outline" label={t.settings.helpSupport}
             onPress={() => router.push('/help')} />
-          <SettingRow c={c} icon="star-outline" label="Rate the App"
+          <SettingRow c={c} icon="star-outline" label={t.settings.rateApp}
             onPress={handleRateApp} />
-          <SettingRow c={c} icon="document-text-outline" label="Terms of Service"
-            onPress={() => openWebview('https://jobfinder.oxbiy.com/terms', 'Terms of Service')} />
-          <SettingRow c={c} icon="shield-outline" label="Privacy Policy"
-            onPress={() => openWebview('https://jobfinder.oxbiy.com/about/privacy', 'Privacy Policy')} last />
+          <SettingRow c={c} icon="document-text-outline" label={t.settings.termsOfService}
+            onPress={() => openWebview('https://jobfinder.oxbiy.com/terms', t.settings.termsOfService)} />
+          <SettingRow c={c} icon="shield-outline" label={t.settings.privacyPolicy}
+            onPress={() => openWebview('https://jobfinder.oxbiy.com/about/privacy', t.settings.privacyPolicy)} last />
         </View>
 
         {/* ── Danger ── */}
-        <GroupTitle c={c} label="Account Actions" />
+        <GroupTitle c={c} label={t.settings.accountActions} />
         <View style={styles.groupCard}>
           <TouchableOpacity
             style={[styles.dangerRow, { borderBottomColor: c.border }]}
@@ -206,17 +218,17 @@ export default function SettingsScreen() {
             <View style={[styles.rowIcon, { backgroundColor: '#C6282818' }]}>
               <Ionicons name="log-out-outline" size={18} color="#C62828" />
             </View>
-            <Text style={styles.dangerLabel}>Log Out</Text>
+            <Text style={styles.dangerLabel}>{t.settings.logOut}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.dangerRow, { borderBottomWidth: 0 }]}
             activeOpacity={0.8}
-            onPress={() => Alert.alert('Delete Account', 'To delete your account, contact Help-support@oxbiy.com')}
+            onPress={() => Alert.alert(t.settings.deleteAccountTitle, t.settings.deleteAccountMessage)}
           >
             <View style={[styles.rowIcon, { backgroundColor: '#C6282818' }]}>
               <Ionicons name="trash-outline" size={18} color="#C62828" />
             </View>
-            <Text style={styles.dangerLabel}>Delete Account</Text>
+            <Text style={styles.dangerLabel}>{t.settings.deleteAccount}</Text>
           </TouchableOpacity>
         </View>
 

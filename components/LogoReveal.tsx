@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useT } from '@/hooks/useT';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function LogoReveal({ onEnd }: Props) {
+  const { t } = useT();
   const jobX     = useSharedValue(-300);
   const finderX  = useSharedValue(300);
   const dotScale = useSharedValue(0);
@@ -55,7 +57,7 @@ export function LogoReveal({ onEnd }: Props) {
       </View>
 
       <Animated.Text style={[styles.tagline, tagStyle]}>
-        YOUR CAREER, YOUR TERMS
+        {t.logoReveal.tagline}
       </Animated.Text>
     </View>
   );

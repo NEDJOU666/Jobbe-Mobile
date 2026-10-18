@@ -9,80 +9,56 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_URL } from '@/lib/api';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 
 const SUPPORT_EMAIL = 'Help-support@oxbiy.com';
 const SUPPORT_PHONE = '+237676887147';
 const SUPPORT_PHONE_DISPLAY = '+237 676 887 147';
 
-const CONTACT = [
-  {
-    icon: 'mail-outline',
-    label: 'Email Support',
-    sub: SUPPORT_EMAIL,
-    color: '#1565C0',
-    onPress: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}`),
-  },
-  {
-    icon: 'call-outline',
-    label: 'Phone Support',
-    sub: SUPPORT_PHONE_DISPLAY,
-    color: '#14A800',
-    onPress: () => Linking.openURL(`tel:${SUPPORT_PHONE}`),
-  },
-  {
-    icon: 'chatbubble-ellipses-outline',
-    label: 'Live Chat',
-    sub: 'Mon–Fri 8am–6pm WAT',
-    color: '#6A1B9A',
-    isChat: true,
-  },
-];
+function getContact(t: ReturnType<typeof useT>['t']) {
+  return [
+    {
+      icon: 'mail-outline',
+      label: t.help.emailSupport,
+      sub: SUPPORT_EMAIL,
+      color: '#1565C0',
+      onPress: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}`),
+    },
+    {
+      icon: 'call-outline',
+      label: t.help.phoneSupport,
+      sub: SUPPORT_PHONE_DISPLAY,
+      color: '#14A800',
+      onPress: () => Linking.openURL(`tel:${SUPPORT_PHONE}`),
+    },
+    {
+      icon: 'chatbubble-ellipses-outline',
+      label: t.help.liveChat,
+      sub: t.help.liveChatHours,
+      color: '#6A1B9A',
+      isChat: true,
+    },
+  ];
+}
 
-const FAQS = [
-  {
-    q: 'How do I create a JobFinder account?',
-    a: 'Tap "Sign Up" on the welcome screen. You can register with your email or use Google. After email verification, complete your profile to start applying for jobs.',
-  },
-  {
-    q: 'How do I reset my password?',
-    a: 'On the login screen tap "Forgot Password". Enter your email and we\'ll send a reset code. The code expires after 1 hour.',
-  },
-  {
-    q: 'Can I have both a job seeker and employer account?',
-    a: 'Yes. Your JobFinder account works as a job seeker. You can also create or join a firm on the web platform to post jobs.',
-  },
-  {
-    q: 'How do I apply for a job?',
-    a: 'Open a job listing and tap "Apply Now". Select your resume, optionally write a cover letter, then submit. You can track your application in the Applications tab.',
-  },
-  {
-    q: 'Can I track my application status?',
-    a: 'Yes — go to the Applications tab to see all your submitted applications and their current status in real time.',
-  },
-  {
-    q: 'Can I withdraw an application?',
-    a: 'Yes. In the Applications tab, tap Withdraw on any application that is still under review. Finalised applications cannot be withdrawn.',
-  },
-  {
-    q: 'What are credits used for?',
-    a: 'Credits boost your application visibility to recruiters. Applying with credits makes your profile appear higher in the recruiter\'s applicant list.',
-  },
-  {
-    q: 'How do I update my resume?',
-    a: 'Go to Documents from the drawer menu. You can upload new files (PDF, DOC) and set one as your default resume.',
-  },
-  {
-    q: 'Is JobFinder free for job seekers?',
-    a: 'Yes. Creating an account, building your profile, and applying to jobs is completely free. We will never charge candidates.',
-  },
-  {
-    q: 'What does "Open to Work" mean?',
-    a: '"Open to Work" signals to recruiters that you\'re actively looking. It can lead to direct interview invitations from companies.',
-  },
-];
+function getFaqs(t: ReturnType<typeof useT>['t']) {
+  return [
+    { q: t.help.faq1Q, a: t.help.faq1A },
+    { q: t.help.faq2Q, a: t.help.faq2A },
+    { q: t.help.faq3Q, a: t.help.faq3A },
+    { q: t.help.faq4Q, a: t.help.faq4A },
+    { q: t.help.faq5Q, a: t.help.faq5A },
+    { q: t.help.faq6Q, a: t.help.faq6A },
+    { q: t.help.faq7Q, a: t.help.faq7A },
+    { q: t.help.faq8Q, a: t.help.faq8A },
+    { q: t.help.faq9Q, a: t.help.faq9A },
+    { q: t.help.faq10Q, a: t.help.faq10A },
+  ];
+}
 
 function ChatModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { colors: c } = useTheme();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -98,7 +74,7 @@ function ChatModal({ visible, onClose }: { visible: boolean; onClose: () => void
 
   const submit = async () => {
     if (!name.trim() || !email.trim() || !message.trim()) {
-      Alert.alert('Required', 'Please fill in all fields.');
+      Alert.alert(t.help.requiredTitle, t.help.requiredMessage);
       return;
     }
     setSending(true);
@@ -117,10 +93,10 @@ function ChatModal({ visible, onClose }: { visible: boolean; onClose: () => void
       if (res.ok) {
         setSent(true);
       } else {
-        Alert.alert('Error', `Failed to send. Email us at ${SUPPORT_EMAIL}`);
+        Alert.alert(t.help.errorTitle, `${t.help.errorMessagePrefix}${SUPPORT_EMAIL}`);
       }
     } catch {
-      Alert.alert('Network error', `Please email us at ${SUPPORT_EMAIL}`);
+      Alert.alert(t.help.networkErrorTitle, `${t.help.networkErrorMessagePrefix}${SUPPORT_EMAIL}`);
     } finally {
       setSending(false);
     }
@@ -138,7 +114,7 @@ function ChatModal({ visible, onClose }: { visible: boolean; onClose: () => void
             <View style={[chatStyles.header, { borderBottomColor: c.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <View style={chatStyles.dot} />
-                <Text style={[chatStyles.headerTitle, { color: c.text }]}>JobFinder Support</Text>
+                <Text style={[chatStyles.headerTitle, { color: c.text }]}>{t.help.chatTitle}</Text>
               </View>
               <TouchableOpacity onPress={reset} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Ionicons name="close" size={20} color={c.textMuted} />
@@ -148,12 +124,12 @@ function ChatModal({ visible, onClose }: { visible: boolean; onClose: () => void
             {sent ? (
               <View style={chatStyles.sentWrap}>
                 <Ionicons name="checkmark-circle" size={52} color="#14A800" />
-                <Text style={[chatStyles.sentTitle, { color: c.text }]}>Message sent!</Text>
+                <Text style={[chatStyles.sentTitle, { color: c.text }]}>{t.help.messageSent}</Text>
                 <Text style={[chatStyles.sentSub, { color: c.textMuted }]}>
-                  Our team will reply to your email within 24 hours on business days.
+                  {t.help.messageSentSub}
                 </Text>
                 <TouchableOpacity style={chatStyles.closeBtn} onPress={reset}>
-                  <Text style={chatStyles.closeBtnText}>Close</Text>
+                  <Text style={chatStyles.closeBtnText}>{t.help.close}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -164,30 +140,30 @@ function ChatModal({ visible, onClose }: { visible: boolean; onClose: () => void
               >
                 <View style={[chatStyles.greeting, { backgroundColor: c.accentBg }]}>
                   <Text style={{ color: c.textBody, fontSize: 13, lineHeight: 19 }}>
-                    Hi 👋 How can we help you? Our team replies within 24 hours, Mon–Fri 8am–6pm WAT.
+                    {t.help.greeting}
                   </Text>
                 </View>
 
-                <Text style={[chatStyles.fieldLabel, { color: c.textBody }]}>Your name</Text>
+                <Text style={[chatStyles.fieldLabel, { color: c.textBody }]}>{t.help.yourName}</Text>
                 <TextInput
                   style={[chatStyles.input, { backgroundColor: c.bg, borderColor: c.border2, color: c.text }]}
                   value={name} onChangeText={setName}
-                  placeholder="Full name" placeholderTextColor={c.textDim}
+                  placeholder={t.help.namePlaceholder} placeholderTextColor={c.textDim}
                 />
 
-                <Text style={[chatStyles.fieldLabel, { color: c.textBody }]}>Email address</Text>
+                <Text style={[chatStyles.fieldLabel, { color: c.textBody }]}>{t.help.emailAddress}</Text>
                 <TextInput
                   style={[chatStyles.input, { backgroundColor: c.bg, borderColor: c.border2, color: c.text }]}
                   value={email} onChangeText={setEmail}
-                  placeholder="you@example.com" placeholderTextColor={c.textDim}
+                  placeholder={t.help.emailPlaceholder} placeholderTextColor={c.textDim}
                   keyboardType="email-address" autoCapitalize="none"
                 />
 
-                <Text style={[chatStyles.fieldLabel, { color: c.textBody }]}>Message</Text>
+                <Text style={[chatStyles.fieldLabel, { color: c.textBody }]}>{t.help.message}</Text>
                 <TextInput
                   style={[chatStyles.input, chatStyles.textarea, { backgroundColor: c.bg, borderColor: c.border2, color: c.text }]}
                   value={message} onChangeText={setMessage}
-                  placeholder="Describe your issue or question…"
+                  placeholder={t.help.messagePlaceholder}
                   placeholderTextColor={c.textDim}
                   multiline numberOfLines={4} textAlignVertical="top"
                 />
@@ -200,7 +176,7 @@ function ChatModal({ visible, onClose }: { visible: boolean; onClose: () => void
                     ? <ActivityIndicator color="#fff" size="small" />
                     : <>
                         <Ionicons name="send" size={14} color="#fff" />
-                        <Text style={chatStyles.sendBtnText}>Send Message</Text>
+                        <Text style={chatStyles.sendBtnText}>{t.help.sendMessage}</Text>
                       </>}
                 </TouchableOpacity>
               </ScrollView>
@@ -215,9 +191,12 @@ function ChatModal({ visible, onClose }: { visible: boolean; onClose: () => void
 export default function HelpScreen() {
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [chatVisible, setChatVisible] = useState(false);
+  const CONTACT = useMemo(() => getContact(t), [t]);
+  const FAQS = useMemo(() => getFaqs(t), [t]);
 
   const toggle = (i: number) => setOpenFaq((p) => (p === i ? null : i));
 
@@ -227,7 +206,7 @@ export default function HelpScreen() {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={c.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Help & Support</Text>
+        <Text style={styles.headerTitle}>{t.help.headerTitle}</Text>
         <View style={{ width: 38 }} />
       </View>
 
@@ -236,17 +215,17 @@ export default function HelpScreen() {
           <View style={styles.heroIcon}>
             <Ionicons name="help-circle-outline" size={36} color={c.accent} />
           </View>
-          <Text style={styles.heroTitle}>How can we help you?</Text>
-          <Text style={styles.heroSub}>Find answers or contact our support team.</Text>
+          <Text style={styles.heroTitle}>{t.help.heroTitle}</Text>
+          <Text style={styles.heroSub}>{t.help.heroSub}</Text>
         </View>
 
         {/* Hours strip */}
         <View style={[styles.hoursStrip, { backgroundColor: c.accentBg, borderColor: c.accentBorder }]}>
           <Ionicons name="time-outline" size={14} color={c.accent} />
-          <Text style={[styles.hoursText, { color: c.accent }]}>Mon–Fri · 8am–6pm WAT · Yaoundé, Cameroon</Text>
+          <Text style={[styles.hoursText, { color: c.accent }]}>{t.help.hoursStrip}</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Contact Us</Text>
+        <Text style={styles.sectionTitle}>{t.help.contactUs}</Text>
         {CONTACT.map(({ icon, label, sub, color, onPress, isChat }) => (
           <TouchableOpacity
             key={label}
@@ -265,7 +244,7 @@ export default function HelpScreen() {
           </TouchableOpacity>
         ))}
 
-        <Text style={[styles.sectionTitle, { marginTop: 8 }]}>FAQ</Text>
+        <Text style={[styles.sectionTitle, { marginTop: 8 }]}>{t.help.faq}</Text>
         {FAQS.map(({ q, a }, i) => (
           <TouchableOpacity
             key={i}
@@ -284,7 +263,7 @@ export default function HelpScreen() {
           </TouchableOpacity>
         ))}
 
-        <Text style={styles.versionText}>Jobbe v1.0.0 · © 2025 JobFinder Global Ltd. · Yaoundé, Cameroon</Text>
+        <Text style={styles.versionText}>{t.help.versionText}</Text>
         <View style={{ height: 32 }} />
       </ScrollView>
 

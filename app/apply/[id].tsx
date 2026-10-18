@@ -3,6 +3,7 @@ import { useCredits } from '@/hooks/useCredits';
 import { useDocuments } from '@/hooks/useDocuments';
 import { useJob } from '@/hooks/useJobs';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
@@ -13,14 +14,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const STEPS = ['Documents', 'Cover Letter', 'Review'];
-
 export default function ApplyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const postId = typeof id === 'string' ? id : '';
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const { t } = useT();
+  const STEPS = [t.applyForm.stepDocuments, t.applyForm.stepCoverLetter, t.applyForm.stepReview];
 
   const { data: job } = useJob(postId);
   const { data: docs = [] } = useDocuments();
@@ -63,7 +64,7 @@ export default function ApplyScreen() {
 
   const handleSubmit = () => {
     if (!postId) {
-      Alert.alert('Invalid job', 'This job link is invalid. Please go back and try again.');
+      Alert.alert(t.applyForm.invalidJobAlertTitle, t.applyForm.invalidJobAlertMessage);
       return;
     }
     const documents = selectedDocs.filter((d) => d.url != null).map((d) => ({ name: d.name, url: d.url as string }));
@@ -79,8 +80,8 @@ export default function ApplyScreen() {
         onSuccess: () => setSubmitted(true),
         onError: (err: any) => {
           const raw = err?.response?.data?.message;
-          const msg = Array.isArray(raw) ? raw.join('\n') : (raw ?? err?.response?.data?.error ?? 'Submission failed. Please try again.');
-          Alert.alert('Application failed', String(msg));
+          const msg = Array.isArray(raw) ? raw.join('\n') : (raw ?? err?.response?.data?.error ?? t.applyForm.submissionFailedMessage);
+          Alert.alert(t.applyForm.applicationFailedAlertTitle, String(msg));
         },
       },
     );
@@ -96,8 +97,8 @@ export default function ApplyScreen() {
         </View>
         <View style={styles.centerWrap}>
           <Ionicons name="alert-circle-outline" size={48} color={c.textMuted} />
-          <Text style={styles.successTitle}>Invalid job</Text>
-          <Text style={styles.successMsg}>This job link is invalid. Please go back and pick a job.</Text>
+          <Text style={styles.successTitle}>{t.applyForm.invalidJobTitle}</Text>
+          <Text style={styles.successMsg}>{t.applyForm.invalidJobScreenMessage}</Text>
         </View>
       </View>
     );
@@ -113,14 +114,14 @@ export default function ApplyScreen() {
         </View>
         <View style={styles.centerWrap}>
           <View style={styles.successCircle}><Ionicons name="checkmark" size={48} color={c.accent} /></View>
-          <Text style={styles.successTitle}>Application Sent!</Text>
+          <Text style={styles.successTitle}>{t.applyForm.applicationSentTitle}</Text>
           <Text style={styles.successMsg}>
-            Your application has been submitted to {(job as any)?.source
-              ? ((job as any)?.properties?.scrapedCompany ?? job?.firm?.name ?? 'the company')
-              : (job?.firm?.name ?? 'the company')}. {"They'll"} review it and get back to you.
+            {t.applyForm.applicationSentPrefix}{(job as any)?.source
+              ? ((job as any)?.properties?.scrapedCompany ?? job?.firm?.name ?? t.applyForm.theCompanyFallback)
+              : (job?.firm?.name ?? t.applyForm.theCompanyFallback)}{t.applyForm.applicationSentSuffix}
           </Text>
           <TouchableOpacity style={styles.doneBtn} onPress={() => router.replace('/(tabs)')} activeOpacity={0.85}>
-            <Text style={styles.doneBtnText}>Back to Jobs</Text>
+            <Text style={styles.doneBtnText}>{t.applyForm.backToJobsButton}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -134,7 +135,7 @@ export default function ApplyScreen() {
         <TouchableOpacity style={styles.iconBtn} onPress={goBack}>
           <Ionicons name={step === 0 ? 'close' : 'arrow-back'} size={20} color={c.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Apply</Text>
+        <Text style={styles.headerTitle}>{t.applyForm.applyHeaderTitle}</Text>
         <View style={{ width: 38 }} />
       </View>
 
@@ -162,7 +163,7 @@ export default function ApplyScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {step === 0 && (
           <StepDocuments
-            c={c} styles={styles}
+            c={c} styles={styles} t={t}
             allDocs={docs}
             resumes={resumes}
             otherDocs={otherDocs}
@@ -172,7 +173,7 @@ export default function ApplyScreen() {
         )}
         {step === 1 && (
           <StepCoverLetter
-            c={c} styles={styles}
+            c={c} styles={styles} t={t}
             coverLetter={coverLetter}
             onChangeCover={setCoverLetter}
             salaryExpectation={salaryExpectation}
@@ -182,7 +183,7 @@ export default function ApplyScreen() {
         )}
         {step === 2 && (
           <StepReview
-            c={c} styles={styles}
+            c={c} styles={styles} t={t}
             selectedDocs={selectedDocs}
             coverLetter={coverLetter}
             salaryExpectation={salaryExpectation}
@@ -207,7 +208,7 @@ export default function ApplyScreen() {
             disabled={step === 0 && selectedDocIds.length === 0 && docs.length > 0}
             onPress={goNext}
           >
-            <Text style={styles.nextBtnText}>Continue</Text>
+            <Text style={styles.nextBtnText}>{t.applyForm.continueButton}</Text>
             <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 6 }} />
           </TouchableOpacity>
         ) : (
@@ -219,7 +220,7 @@ export default function ApplyScreen() {
           >
             {isPending
               ? <ActivityIndicator color="#fff" size="small" />
-              : <><Text style={styles.nextBtnText}>Submit Application</Text><Ionicons name="send" size={16} color="#fff" style={{ marginLeft: 8 }} /></>
+              : <><Text style={styles.nextBtnText}>{t.applyForm.submitApplicationButton}</Text><Ionicons name="send" size={16} color="#fff" style={{ marginLeft: 8 }} /></>
             }
           </TouchableOpacity>
         )}
@@ -228,32 +229,32 @@ export default function ApplyScreen() {
   );
 }
 
-function StepDocuments({ c, styles, allDocs, resumes, otherDocs, selectedIds, onToggle }: {
-  c: any; styles: any;
+function StepDocuments({ c, styles, t, allDocs, resumes, otherDocs, selectedIds, onToggle }: {
+  c: any; styles: any; t: any;
   allDocs: any[]; resumes: any[]; otherDocs: any[];
   selectedIds: string[]; onToggle: (id: string) => void;
 }) {
   return (
     <View>
-      <Text style={styles.sectionTitle}>Your Documents</Text>
+      <Text style={styles.sectionTitle}>{t.applyForm.yourDocumentsTitle}</Text>
       <Text style={styles.sectionHint}>
-        Select one or more documents to attach. {selectedIds.length > 0 ? `${selectedIds.length} selected.` : ''}
+        {t.applyForm.selectDocumentsHint} {selectedIds.length > 0 ? `${selectedIds.length}${t.applyForm.selectedCountSuffix}` : ''}
       </Text>
 
       {allDocs.length === 0 ? (
         <View style={styles.emptyDocs}>
           <Ionicons name="document-outline" size={40} color={c.border3} />
-          <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>No documents uploaded yet.{'\n'}Upload your CV in the Documents section.</Text>
+          <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>{t.applyForm.noDocumentsUploadedLine1}{'\n'}{t.applyForm.noDocumentsUploadedLine2}</Text>
           <TouchableOpacity style={styles.uploadBtn} onPress={() => router.push('/documents')}>
             <Ionicons name="add-circle-outline" size={18} color={c.accent} />
-            <Text style={styles.uploadText}>Go to Documents</Text>
+            <Text style={styles.uploadText}>{t.applyForm.goToDocumentsButton}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <>
           {resumes.length > 0 && (
             <>
-              <Text style={styles.docGroupLabel}>CV / Resume</Text>
+              <Text style={styles.docGroupLabel}>{t.applyForm.cvResumeLabel}</Text>
               {resumes.map((doc) => {
                 const selected = selectedIds.includes(doc.id);
                 return (
@@ -264,7 +265,7 @@ function StepDocuments({ c, styles, allDocs, resumes, otherDocs, selectedIds, on
                     <View style={styles.docInfo}>
                       <Text style={styles.docName}>{doc.name}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                        {doc.isDefault && <View style={styles.defaultBadge}><Text style={styles.defaultBadgeText}>Default</Text></View>}
+                        {doc.isDefault && <View style={styles.defaultBadge}><Text style={styles.defaultBadgeText}>{t.applyForm.defaultBadge}</Text></View>}
                         {doc.size ? <Text style={styles.docSize}>{doc.size}</Text> : null}
                       </View>
                     </View>
@@ -278,7 +279,7 @@ function StepDocuments({ c, styles, allDocs, resumes, otherDocs, selectedIds, on
           )}
           {otherDocs.length > 0 && (
             <>
-              <Text style={[styles.docGroupLabel, { marginTop: 14 }]}>Other Documents</Text>
+              <Text style={[styles.docGroupLabel, { marginTop: 14 }]}>{t.applyForm.otherDocumentsLabel}</Text>
               {otherDocs.map((doc) => {
                 const selected = selectedIds.includes(doc.id);
                 return (
@@ -300,17 +301,17 @@ function StepDocuments({ c, styles, allDocs, resumes, otherDocs, selectedIds, on
           )}
           <TouchableOpacity style={styles.addMoreBtn} onPress={() => router.push('/documents')}>
             <Ionicons name="add-circle-outline" size={18} color={c.accent} />
-            <Text style={styles.uploadText}>Upload new document</Text>
+            <Text style={styles.uploadText}>{t.applyForm.uploadNewDocumentButton}</Text>
           </TouchableOpacity>
         </>
       )}
-      <Text style={styles.docHint}>PDF, DOC, DOCX, JPG, PNG supported</Text>
+      <Text style={styles.docHint}>{t.applyForm.supportedFormatsHint}</Text>
     </View>
   );
 }
 
-function StepCoverLetter({ c, styles, coverLetter, onChangeCover, salaryExpectation, onChangeSalary, job }: {
-  c: any; styles: any;
+function StepCoverLetter({ c, styles, t, coverLetter, onChangeCover, salaryExpectation, onChangeSalary, job }: {
+  c: any; styles: any; t: any;
   coverLetter: string; onChangeCover: (t: string) => void;
   salaryExpectation: string; onChangeSalary: (t: string) => void;
   job: any;
@@ -318,38 +319,38 @@ function StepCoverLetter({ c, styles, coverLetter, onChangeCover, salaryExpectat
   const hasSalary = job?.properties?.salaryMin || job?.properties?.salaryMax;
   return (
     <View>
-      <Text style={styles.sectionTitle}>Cover Letter</Text>
-      <Text style={styles.sectionHint}>Optional — tell the recruiter why you're the right fit</Text>
+      <Text style={styles.sectionTitle}>{t.applyForm.coverLetterTitle}</Text>
+      <Text style={styles.sectionHint}>{t.applyForm.coverLetterHint}</Text>
       <TextInput
         style={styles.textarea}
-        placeholder="Briefly describe why you're a great fit for this role…"
+        placeholder={t.applyForm.coverLetterPlaceholder}
         placeholderTextColor={c.textDim}
         value={coverLetter}
-        onChangeText={(t) => t.length <= 1000 && onChangeCover(t)}
+        onChangeText={(txt) => txt.length <= 1000 && onChangeCover(txt)}
         multiline
         numberOfLines={8}
         textAlignVertical="top"
       />
-      <Text style={styles.charCount}>{coverLetter.length} / 1000</Text>
+      <Text style={styles.charCount}>{coverLetter.length}{t.applyForm.charCountSuffix}</Text>
 
       <View style={styles.tipCard}>
         <Ionicons name="bulb-outline" size={16} color="#F57F17" />
-        <Text style={styles.tipText}>Keep it short (3–5 sentences). Mention the role, your key skill, and why this company.</Text>
+        <Text style={styles.tipText}>{t.applyForm.coverLetterTip}</Text>
       </View>
 
       {/* Salary Expectation */}
-      <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Salary Expectation</Text>
+      <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t.applyForm.salaryExpectationTitle}</Text>
       <Text style={styles.sectionHint}>
-        Optional{hasSalary ? ` — posted range: ${job.properties?.currency ?? 'XAF'} ${job.properties?.salaryMin?.toLocaleString() ?? '?'}${job.properties?.salaryMax ? ` – ${job.properties.salaryMax.toLocaleString()}` : '+'}` : ''}
+        {t.applyForm.salaryOptionalLabel}{hasSalary ? `${t.applyForm.salaryPostedRangePrefix}${job.properties?.currency ?? 'XAF'} ${job.properties?.salaryMin?.toLocaleString() ?? '?'}${job.properties?.salaryMax ? ` – ${job.properties.salaryMax.toLocaleString()}` : '+'}` : ''}
       </Text>
       <View style={styles.inputRow}>
         <Text style={styles.currencyLabel}>XAF</Text>
         <TextInput
           style={[styles.input, { flex: 1 }]}
-          placeholder="e.g. 200000"
+          placeholder={t.applyForm.salaryPlaceholder}
           placeholderTextColor={c.textDim}
           value={salaryExpectation}
-          onChangeText={(t) => onChangeSalary(t.replace(/\D/g, ''))}
+          onChangeText={(txt) => onChangeSalary(txt.replace(/\D/g, ''))}
           keyboardType="numeric"
           returnKeyType="done"
         />
@@ -363,8 +364,8 @@ function StepCoverLetter({ c, styles, coverLetter, onChangeCover, salaryExpectat
   );
 }
 
-function StepReview({ c, styles, selectedDocs, coverLetter, salaryExpectation, jobTitle, firm, isScrapedNoEmail, sourceUrl, creditBalance }: {
-  c: any; styles: any;
+function StepReview({ c, styles, t, selectedDocs, coverLetter, salaryExpectation, jobTitle, firm, isScrapedNoEmail, sourceUrl, creditBalance }: {
+  c: any; styles: any; t: any;
   selectedDocs: any[];
   coverLetter: string; salaryExpectation: string; jobTitle: string; firm: string;
   isScrapedNoEmail?: boolean; sourceUrl?: string; creditBalance: number;
@@ -374,24 +375,24 @@ function StepReview({ c, styles, selectedDocs, coverLetter, salaryExpectation, j
 
   return (
     <View style={{ gap: 14 }}>
-      <Text style={styles.sectionTitle}>Review your application</Text>
-      <Text style={styles.sectionHint}>Check everything before submitting</Text>
+      <Text style={styles.sectionTitle}>{t.applyForm.reviewTitle}</Text>
+      <Text style={styles.sectionHint}>{t.applyForm.reviewHint}</Text>
 
       {/* Credit cost banner */}
       <View style={[styles.creditCard, !hasEnough && styles.creditCardWarn]}>
         <Ionicons name="wallet-outline" size={18} color={hasEnough ? c.accent : '#E65100'} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.creditCost, !hasEnough && { color: '#E65100' }]}>
-            {APPLY_COST} credit will be spent to submit
+            {APPLY_COST}{t.applyForm.creditWillBeSpentSuffix}
           </Text>
           <Text style={[styles.creditBalance, !hasEnough && { color: '#E65100' }]}>
-            Your balance: <Text style={{ fontWeight: '800' }}>{creditBalance}</Text> credits
-            {!hasEnough ? ' — not enough!' : ''}
+            {t.applyForm.yourBalancePrefix}<Text style={{ fontWeight: '800' }}>{creditBalance}</Text>{t.applyForm.creditsSuffix}
+            {!hasEnough ? t.applyForm.notEnoughSuffix : ''}
           </Text>
         </View>
         {!hasEnough && (
           <TouchableOpacity onPress={() => router.push('/credits')} activeOpacity={0.8}>
-            <Text style={{ color: '#E65100', fontWeight: '700', fontSize: 12 }}>Top up →</Text>
+            <Text style={{ color: '#E65100', fontWeight: '700', fontSize: 12 }}>{t.applyForm.topUpButton}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -399,18 +400,18 @@ function StepReview({ c, styles, selectedDocs, coverLetter, salaryExpectation, j
       {/* Summary rows */}
       <View style={styles.reviewCard}>
         <View style={styles.reviewRow}>
-          <Text style={styles.reviewLabel}>Position</Text>
+          <Text style={styles.reviewLabel}>{t.applyForm.positionLabel}</Text>
           <Text style={styles.reviewValue} numberOfLines={2}>{jobTitle}</Text>
         </View>
         <View style={[styles.reviewRow, { borderTopWidth: 1, borderTopColor: c.border }]}>
-          <Text style={styles.reviewLabel}>Company</Text>
+          <Text style={styles.reviewLabel}>{t.applyForm.companyLabel}</Text>
           <Text style={styles.reviewValue}>{firm}</Text>
         </View>
       </View>
 
       {/* Documents */}
       <View style={styles.reviewCard}>
-        <Text style={styles.reviewCardLabel}>Documents ({selectedDocs.length})</Text>
+        <Text style={styles.reviewCardLabel}>{t.applyForm.documentsLabel} ({selectedDocs.length})</Text>
         {selectedDocs.length > 0 ? (
           selectedDocs.map((doc) => (
             <View key={doc.id} style={styles.reviewDocRow}>
@@ -419,23 +420,23 @@ function StepReview({ c, styles, selectedDocs, coverLetter, salaryExpectation, j
             </View>
           ))
         ) : (
-          <Text style={styles.reviewCoverEmpty}>No documents selected</Text>
+          <Text style={styles.reviewCoverEmpty}>{t.applyForm.noDocumentsSelected}</Text>
         )}
       </View>
 
       {/* Cover letter */}
       <View style={styles.reviewCard}>
-        <Text style={styles.reviewCardLabel}>Cover Letter</Text>
+        <Text style={styles.reviewCardLabel}>{t.applyForm.coverLetterTitle}</Text>
         {coverLetter.trim()
           ? <Text style={styles.reviewCoverText} numberOfLines={5}>{coverLetter}</Text>
-          : <Text style={styles.reviewCoverEmpty}>None added</Text>}
+          : <Text style={styles.reviewCoverEmpty}>{t.applyForm.noneAdded}</Text>}
       </View>
 
       {/* Salary expectation */}
       {salaryExpectation ? (
         <View style={styles.reviewCard}>
-          <Text style={styles.reviewCardLabel}>Salary Expectation</Text>
-          <Text style={styles.reviewValue}>XAF {parseInt(salaryExpectation, 10).toLocaleString()} / month</Text>
+          <Text style={styles.reviewCardLabel}>{t.applyForm.salaryExpectationTitle}</Text>
+          <Text style={styles.reviewValue}>XAF {parseInt(salaryExpectation, 10).toLocaleString()}{t.applyForm.perMonthSuffix}</Text>
         </View>
       ) : null}
 
@@ -445,10 +446,10 @@ function StepReview({ c, styles, selectedDocs, coverLetter, salaryExpectation, j
           <Ionicons name="information-circle-outline" size={18} color="#1e88e5" />
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={styles.noticeText}>
-              We'll save your application. For best results, also apply directly on the original posting.
+              {t.applyForm.scrapedNoticeText}
             </Text>
             <TouchableOpacity onPress={() => Linking.openURL(sourceUrl)} activeOpacity={0.8}>
-              <Text style={styles.noticeLink}>View original posting →</Text>
+              <Text style={styles.noticeLink}>{t.applyForm.viewOriginalPostingLink}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -456,7 +457,7 @@ function StepReview({ c, styles, selectedDocs, coverLetter, salaryExpectation, j
 
       <View style={styles.consentRow}>
         <Ionicons name="shield-checkmark-outline" size={16} color={c.textMuted} />
-        <Text style={styles.consentText}>By submitting, you agree to share your profile and resume with the employer.</Text>
+        <Text style={styles.consentText}>{t.applyForm.consentText}</Text>
       </View>
     </View>
   );

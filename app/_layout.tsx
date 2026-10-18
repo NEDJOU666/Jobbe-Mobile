@@ -11,7 +11,9 @@ import 'react-native-reanimated';
 import { queryClient } from '@/lib/queryClient';
 import { useTheme } from '@/hooks/useTheme';
 import { useThemeStore } from '@/store/themeStore';
+import { useLanguageStore } from '@/store/languageStore';
 import { useAppUpdate } from '@/hooks/useAppUpdate';
+import { useT } from '@/hooks/useT';
 
 // expo-notifications removed push support from Expo Go in SDK 53.
 // Importing it at module level triggers DevicePushTokenAutoRegistration.fx.js
@@ -24,14 +26,15 @@ export const unstable_settings = {
 
 function UpdateBanner() {
   const { updateAvailable, applying, applyUpdate } = useAppUpdate();
+  const { t } = useT();
   if (!updateAvailable) return null;
   return (
     <View style={updateStyles.banner}>
-      <Text style={updateStyles.text}>Nouvelle version disponible</Text>
+      <Text style={updateStyles.text}>{t.common.updateAvailable}</Text>
       <TouchableOpacity style={updateStyles.btn} onPress={applyUpdate} disabled={applying}>
         {applying
           ? <ActivityIndicator size="small" color="#fff" />
-          : <Text style={updateStyles.btnText}>Mettre à jour</Text>}
+          : <Text style={updateStyles.btnText}>{t.common.updateNow}</Text>}
       </TouchableOpacity>
     </View>
   );
@@ -55,9 +58,11 @@ const updateStyles = StyleSheet.create({
 
 export default function RootLayout() {
   const { hydrate } = useThemeStore();
+  const { hydrate: hydrateLanguage } = useLanguageStore();
   const { isDark, colors: c } = useTheme();
 
   useEffect(() => { hydrate(); }, [hydrate]);
+  useEffect(() => { hydrateLanguage(); }, [hydrateLanguage]);
 
   // Fix white flash at bottom when keyboard closes on Android (edge-to-edge + keyboard)
   useEffect(() => {

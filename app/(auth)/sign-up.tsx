@@ -8,6 +8,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@/hooks/useAuth';
+import { useT } from '@/hooks/useT';
 
 const COUNTRIES = [
   'Cameroon', 'Nigeria', 'Ghana', 'Kenya', 'South Africa', 'Ethiopia', 'Tanzania',
@@ -36,6 +37,7 @@ function GoogleLogo() {
 }
 
 export default function SignUpScreen() {
+  const { t } = useT();
   const { signup, sendVerificationOtp, isLoading, error } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -50,15 +52,15 @@ export default function SignUpScreen() {
 
   const handleSignup = async () => {
     if (!firstName || !lastName || !email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert(t.signUp.errorTitle, t.signUp.errorFillFields);
       return;
     }
     if (password.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters');
+      Alert.alert(t.signUp.errorTitle, t.signUp.errorPasswordLength);
       return;
     }
     if (!agreedTerms) {
-      Alert.alert('Error', 'You must accept the terms and conditions');
+      Alert.alert(t.signUp.errorTitle, t.signUp.errorAcceptTerms);
       return;
     }
 
@@ -67,7 +69,7 @@ export default function SignUpScreen() {
       // OTP is auto-sent by the backend on signup — go straight to verify screen
       router.replace('/(auth)/verify-otp');
     } catch (err: any) {
-      Alert.alert('Signup Failed', error || 'Please try again');
+      Alert.alert(t.signUp.signupFailedTitle, error || t.signUp.signupFailedDefault);
     }
   };
 
@@ -100,7 +102,7 @@ export default function SignUpScreen() {
             <Text style={styles.logoText}>JOBFINDER</Text>
             <View style={styles.logoDot} />
           </View>
-          <Text style={styles.tagline}>Sign up to find work you love</Text>
+          <Text style={styles.tagline}>{t.signUp.tagline}</Text>
         </Animated.View>
 
         {/* Google */}
@@ -115,21 +117,21 @@ export default function SignUpScreen() {
             )}
           >
             <GoogleLogo />
-            <Text style={styles.googleBtnText}>Continue with Google</Text>
+            <Text style={styles.googleBtnText}>{t.signUp.continueWithGoogle}</Text>
           </TouchableOpacity>
         </Animated.View>
 
         {/* Divider */}
         <Animated.View entering={FadeInDown.delay(210).duration(500)} style={styles.dividerRow}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or</Text>
+          <Text style={styles.dividerText}>{t.signUp.or}</Text>
           <View style={styles.dividerLine} />
         </Animated.View>
 
         {/* Name row */}
         <Animated.View entering={FadeInDown.delay(270).duration(500)} style={styles.nameRow}>
           <View style={styles.nameField}>
-            <Text style={styles.fieldLabel}>First name</Text>
+            <Text style={styles.fieldLabel}>{t.signUp.firstName}</Text>
             <TextInput
               style={inputStyle('firstName')}
               value={firstName}
@@ -141,7 +143,7 @@ export default function SignUpScreen() {
             />
           </View>
           <View style={styles.nameField}>
-            <Text style={styles.fieldLabel}>Last name</Text>
+            <Text style={styles.fieldLabel}>{t.signUp.lastName}</Text>
             <TextInput
               style={inputStyle('lastName')}
               value={lastName}
@@ -156,7 +158,7 @@ export default function SignUpScreen() {
 
         {/* Email */}
         <Animated.View entering={FadeInDown.delay(320).duration(500)}>
-          <Text style={styles.fieldLabel}>Email</Text>
+          <Text style={styles.fieldLabel}>{t.signUp.email}</Text>
           <TextInput
             style={inputStyle('email')}
             value={email}
@@ -172,13 +174,13 @@ export default function SignUpScreen() {
 
         {/* Password */}
         <Animated.View entering={FadeInDown.delay(370).duration(500)}>
-          <Text style={styles.fieldLabel}>Password</Text>
+          <Text style={styles.fieldLabel}>{t.signUp.password}</Text>
           <View style={[styles.passwordWrapper, focusedField === 'password' && styles.inputFocused]}>
             <TextInput
               style={styles.passwordInput}
               value={password}
               onChangeText={setPassword}
-              placeholder="Password (8 or more characters)"
+              placeholder={t.signUp.passwordPlaceholder}
               placeholderTextColor="#999"
               secureTextEntry={!showPassword}
               onFocus={() => setFocusedField('password')}
@@ -197,7 +199,7 @@ export default function SignUpScreen() {
 
         {/* Country */}
         <Animated.View entering={FadeInDown.delay(420).duration(500)}>
-          <Text style={styles.fieldLabel}>Country</Text>
+          <Text style={styles.fieldLabel}>{t.signUp.country}</Text>
           <TouchableOpacity
             style={styles.countryPicker}
             activeOpacity={0.8}
@@ -220,7 +222,7 @@ export default function SignUpScreen() {
               {receiveEmails && <Ionicons name="checkmark" size={13} color="#fff" />}
             </View>
             <Text style={styles.checkboxLabel}>
-              Send me helpful emails to find rewarding work and job leads.
+              {t.signUp.receiveEmails}
             </Text>
           </TouchableOpacity>
 
@@ -234,10 +236,10 @@ export default function SignUpScreen() {
               {agreedTerms && <Ionicons name="checkmark" size={13} color="#fff" />}
             </View>
             <Text style={styles.checkboxLabel}>
-              Yes, I understand and agree to the{' '}
-              <Text style={styles.link} onPress={() => Linking.openURL('https://jobfinder.oxbiy.com/terms')}>Terms of Service</Text>, including the{' '}
-              <Text style={styles.link} onPress={() => Linking.openURL('https://jobfinder.oxbiy.com/terms')}>User Agreement</Text> and{' '}
-              <Text style={styles.link} onPress={() => Linking.openURL('https://jobfinder.oxbiy.com/about/privacy')}>Privacy Policy</Text>.
+              {t.signUp.agreeTermsPrefix}
+              <Text style={styles.link} onPress={() => Linking.openURL('https://jobfinder.oxbiy.com/terms')}>{t.signUp.termsOfService}</Text>{t.signUp.includingThe}
+              <Text style={styles.link} onPress={() => Linking.openURL('https://jobfinder.oxbiy.com/terms')}>{t.signUp.userAgreement}</Text>{t.signUp.and}
+              <Text style={styles.link} onPress={() => Linking.openURL('https://jobfinder.oxbiy.com/about/privacy')}>{t.signUp.privacyPolicy}</Text>{t.signUp.period}
             </Text>
           </TouchableOpacity>
         </Animated.View>
@@ -251,16 +253,16 @@ export default function SignUpScreen() {
             onPress={handleSignup}
           >
             <Text style={styles.createBtnText}>
-              {isLoading ? 'Creating account...' : 'Create my account'}
+              {isLoading ? t.signUp.creatingAccount : t.signUp.createAccount}
             </Text>
           </TouchableOpacity>
         </Animated.View>
 
         {/* Login link */}
         <Animated.View entering={FadeInDown.delay(580).duration(500)} style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account? </Text>
+          <Text style={styles.footerText}>{t.signUp.haveAccount}</Text>
           <TouchableOpacity onPress={() => router.replace('/(auth)/sign-in')} disabled={isLoading}>
-            <Text style={styles.footerLink}>Log In</Text>
+            <Text style={styles.footerLink}>{t.signUp.logIn}</Text>
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
@@ -271,7 +273,7 @@ export default function SignUpScreen() {
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowCountryPicker(false)} />
           <View style={styles.pickerSheet}>
             <View style={styles.pickerHandle} />
-            <Text style={styles.pickerTitle}>Select Country</Text>
+            <Text style={styles.pickerTitle}>{t.signUp.selectCountry}</Text>
             <FlatList
               data={COUNTRIES}
               keyExtractor={(item) => item}

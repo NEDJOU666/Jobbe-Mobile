@@ -1,5 +1,6 @@
 import { useCredits } from '@/hooks/useCredits';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 import { api } from '@/lib/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -25,19 +26,6 @@ interface CreditPack {
 
 type PaymentState = 'idle' | 'paying' | 'waiting' | 'success' | 'failed';
 
-const PROVIDERS = [
-  { value: 'MTN', label: 'MTN MoMo', color: '#FFC107' },
-  { value: 'ORANGE', label: 'Orange Money', color: '#FF6D00' },
-] as const;
-
-const TX_LABEL: Record<string, string> = {
-  PURCHASE: 'Credits purchased',
-  SPEND: 'Credits spent',
-  REFUND: 'Credits refunded',
-  BONUS: 'Bonus credits',
-  ADJUSTMENT: 'Credit adjustment',
-};
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
@@ -52,11 +40,25 @@ function useCreditPacks() {
 export default function CreditsScreen() {
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(c), [c]);
   const queryClient = useQueryClient();
 
   const { data, isLoading, isError, refetch } = useCredits();
   const { data: packs = [], isLoading: packsLoading } = useCreditPacks();
+
+  const PROVIDERS = [
+    { value: 'MTN', label: t.credits.providerMtnLabel, color: '#FFC107' },
+    { value: 'ORANGE', label: t.credits.providerOrangeLabel, color: '#FF6D00' },
+  ] as const;
+
+  const TX_LABEL: Record<string, string> = {
+    PURCHASE: t.credits.txPurchase,
+    SPEND: t.credits.txSpend,
+    REFUND: t.credits.txRefund,
+    BONUS: t.credits.txBonus,
+    ADJUSTMENT: t.credits.txAdjustment,
+  };
 
   const balance = data?.balance ?? 0;
   const transactions = data?.transactions ?? [];
@@ -122,7 +124,7 @@ export default function CreditsScreen() {
     if (!selectedPack) return;
     const clean = phone.replace(/\D/g, '');
     if (clean.length < 9 || clean.length > 15) {
-      Alert.alert('Invalid number', 'Enter a valid mobile money number (9–15 digits).');
+      Alert.alert(t.credits.invalidNumberTitle, t.credits.invalidNumberMessage);
       return;
     }
     setPaymentState('paying');
@@ -139,13 +141,13 @@ export default function CreditsScreen() {
         startPolling(data.paymentId);
       } else {
         setPaymentState('idle');
-        Alert.alert('Payment Error', 'Could not initiate payment. Please try again.');
+        Alert.alert(t.credits.paymentErrorTitle, t.credits.paymentErrorInitiate);
       }
     } catch (err: any) {
       setPaymentState('idle');
       const raw = err?.response?.data?.message;
-      const msg = Array.isArray(raw) ? raw.join('\n') : (raw ?? 'Payment failed. Please try again.');
-      Alert.alert('Payment Error', String(msg));
+      const msg = Array.isArray(raw) ? raw.join('\n') : (raw ?? t.credits.paymentErrorDefault);
+      Alert.alert(t.credits.paymentErrorTitle, String(msg));
     }
   };
 
@@ -161,9 +163,9 @@ export default function CreditsScreen() {
     return (
       <View style={[styles.container, styles.center, { paddingTop: insets.top + 40 }]}>
         <Ionicons name="cloud-offline-outline" size={48} color={c.border3} />
-        <Text style={styles.emptyText}>Could not load credits</Text>
+        <Text style={styles.emptyText}>{t.credits.loadError}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-          <Text style={styles.retryText}>Retry</Text>
+          <Text style={styles.retryText}>{t.credits.retry}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -176,7 +178,7 @@ export default function CreditsScreen() {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={c.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Credits</Text>
+        <Text style={styles.headerTitle}>{t.credits.title}</Text>
         <View style={{ width: 38 }} />
       </View>
 
@@ -184,29 +186,29 @@ export default function CreditsScreen() {
         {/* Balance card */}
         <View style={styles.balanceCard}>
           <View style={styles.balanceLeft}>
-            <Text style={styles.balanceLabel}>Available credits</Text>
+            <Text style={styles.balanceLabel}>{t.credits.availableCredits}</Text>
             <View style={styles.balanceRow}>
               <Ionicons name="wallet-outline" size={22} color={c.accent} />
               <Text style={styles.balanceValue}>{balance}</Text>
             </View>
-            <Text style={styles.balanceHint}>1 credit = 100 XAF</Text>
+            <Text style={styles.balanceHint}>{t.credits.creditsUnit}</Text>
           </View>
           <View style={styles.balanceCircle}>
             <Text style={styles.balanceCircleNum}>{balance}</Text>
-            <Text style={styles.balanceCircleLabel}>credits</Text>
+            <Text style={styles.balanceCircleLabel}>{t.credits.creditsLabel}</Text>
           </View>
         </View>
 
         {/* Packs */}
-        <Text style={styles.sectionTitle}>Top Up</Text>
-        <Text style={styles.sectionHint}>Buy credits via MTN or Orange Mobile Money.</Text>
+        <Text style={styles.sectionTitle}>{t.credits.topUp}</Text>
+        <Text style={styles.sectionHint}>{t.credits.topUpHint}</Text>
 
         {packsLoading ? (
           <ActivityIndicator color={c.accent} style={{ marginTop: 16 }} />
         ) : packs.length === 0 ? (
           <View style={styles.emptyPacks}>
             <Ionicons name="cash-outline" size={36} color={c.border3} />
-            <Text style={styles.emptyText}>No packs available right now.</Text>
+            <Text style={styles.emptyText}>{t.credits.noPacks}</Text>
           </View>
         ) : (
           packs.map((pack) => {
@@ -227,7 +229,7 @@ export default function CreditsScreen() {
                       <Text style={styles.planCredits}>{total} credits</Text>
                       {pack.bonusCredits > 0 && (
                         <View style={styles.bonusBadge}>
-                          <Text style={styles.bonusText}>+{pack.bonusCredits} bonus</Text>
+                          <Text style={styles.bonusText}>+{pack.bonusCredits} {t.credits.bonusSuffix}</Text>
                         </View>
                       )}
                     </View>
@@ -244,7 +246,7 @@ export default function CreditsScreen() {
                 >
                   <Ionicons name="phone-portrait-outline" size={16} color={isPopular ? '#fff' : c.accent} />
                   <Text style={[styles.buyBtnText, isPopular && styles.buyBtnTextPopular]}>
-                    Buy — {pack.price.toLocaleString()} XAF
+                    {t.credits.buyPrefix} — {pack.price.toLocaleString()} XAF
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -253,9 +255,9 @@ export default function CreditsScreen() {
         )}
 
         {/* Transaction History */}
-        <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Transaction History</Text>
+        <Text style={[styles.sectionTitle, { marginTop: 8 }]}>{t.credits.transactionHistory}</Text>
         {transactions.length === 0 ? (
-          <Text style={styles.sectionHint}>No transactions yet.</Text>
+          <Text style={styles.sectionHint}>{t.credits.noTransactions}</Text>
         ) : (
           transactions.map((tx) => {
             const isIncoming = tx.amount > 0;
@@ -298,13 +300,13 @@ export default function CreditsScreen() {
               {paymentState === 'success' && (
                 <View style={styles.stateBox}>
                   <Ionicons name="checkmark-circle" size={60} color={c.accent} />
-                  <Text style={styles.stateTitle}>Payment Confirmed!</Text>
+                  <Text style={styles.stateTitle}>{t.credits.paymentConfirmedTitle}</Text>
                   <Text style={styles.stateMsg}>
-                    <Text style={{ fontWeight: '800' }}>{creditsGranted > 0 ? creditsGranted.toLocaleString() : (selectedPack?.credits ?? 0) + (selectedPack?.bonusCredits ?? 0)} credits</Text>
-                    {' '}have been added to your account.
+                    <Text style={{ fontWeight: '800' }}>{creditsGranted > 0 ? creditsGranted.toLocaleString() : (selectedPack?.credits ?? 0) + (selectedPack?.bonusCredits ?? 0)} {t.credits.creditsLabel}</Text>
+                    {' '}{t.credits.creditsAddedSuffix}
                   </Text>
                   <TouchableOpacity style={[styles.buyBtn, styles.buyBtnPopular, { marginTop: 8 }]} onPress={closeModal}>
-                    <Text style={styles.buyBtnTextPopular}>Done</Text>
+                    <Text style={styles.buyBtnTextPopular}>{t.credits.done}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -315,29 +317,29 @@ export default function CreditsScreen() {
                   <View style={styles.waitingCircle}>
                     <Ionicons name="phone-portrait-outline" size={30} color="#F57F17" />
                   </View>
-                  <Text style={styles.stateTitle}>Check Your Phone</Text>
+                  <Text style={styles.stateTitle}>{t.credits.checkPhoneTitle}</Text>
                   <Text style={styles.stateMsg}>
-                    A push notification was sent to{' '}
+                    {t.credits.pushSentPrefix}{' '}
                     <Text style={{ fontWeight: '700' }}>{phone.replace(/\D/g, '')}</Text>.
-                    {'\n\n'}Approve the{' '}
+                    {'\n\n'}{t.credits.approvePrefix}{' '}
                     <Text style={{ fontWeight: '700' }}>
-                      {provider === 'MTN' ? 'MTN Mobile Money' : 'Orange Money'}
+                      {provider === 'MTN' ? t.credits.providerMtnFull : t.credits.providerOrangeFull}
                     </Text>
-                    {' '}payment of{' '}
+                    {' '}{t.credits.paymentOfSuffix}{' '}
                     <Text style={{ fontWeight: '700' }}>
                       {selectedPack?.price.toLocaleString()} {selectedPack?.currency}
                     </Text>
-                    {' '}on your phone.
+                    {' '}{t.credits.onYourPhoneSuffix}
                   </Text>
                   <View style={styles.checkingRow}>
                     <ActivityIndicator size="small" color={c.textMuted} />
-                    <Text style={styles.checkingText}>Checking status every 3s…</Text>
+                    <Text style={styles.checkingText}>{t.credits.checkingStatus}</Text>
                   </View>
                   <TouchableOpacity
                     style={[styles.buyBtn, { borderColor: c.border2, marginTop: 8 }]}
                     onPress={closeModal}
                   >
-                    <Text style={[styles.buyBtnText, { color: c.textMuted }]}>Cancel</Text>
+                    <Text style={[styles.buyBtnText, { color: c.textMuted }]}>{t.credits.cancelButton}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -348,22 +350,22 @@ export default function CreditsScreen() {
                   <View style={[styles.waitingCircle, { backgroundColor: '#FFEBEE' }]}>
                     <Ionicons name="close-circle-outline" size={30} color="#C62828" />
                   </View>
-                  <Text style={[styles.stateTitle, { color: '#C62828' }]}>Payment Failed</Text>
+                  <Text style={[styles.stateTitle, { color: '#C62828' }]}>{t.credits.paymentFailedTitle}</Text>
                   <Text style={styles.stateMsg}>
-                    The payment was declined or expired. Please try again.
+                    {t.credits.paymentFailedMessage}
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
                     <TouchableOpacity
                       style={[styles.buyBtn, { flex: 1, borderColor: c.border2 }]}
                       onPress={closeModal}
                     >
-                      <Text style={[styles.buyBtnText, { color: c.textMuted }]}>Close</Text>
+                      <Text style={[styles.buyBtnText, { color: c.textMuted }]}>{t.credits.close}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.buyBtn, styles.buyBtnPopular, { flex: 1 }]}
                       onPress={() => setPaymentState('idle')}
                     >
-                      <Text style={styles.buyBtnTextPopular}>Try Again</Text>
+                      <Text style={styles.buyBtnTextPopular}>{t.credits.tryAgain}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -375,7 +377,7 @@ export default function CreditsScreen() {
                   <View style={styles.modalHandle} />
                   <View style={styles.modalHeader}>
                     <View>
-                      <Text style={styles.modalTitle}>Complete Purchase</Text>
+                      <Text style={styles.modalTitle}>{t.credits.completePurchase}</Text>
                       <Text style={styles.modalSubtitle}>{selectedPack?.name}</Text>
                     </View>
                     <TouchableOpacity onPress={closeModal}>
@@ -388,7 +390,7 @@ export default function CreditsScreen() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Ionicons name="wallet-outline" size={18} color="#F57F17" />
                       <Text style={styles.summaryCredits}>
-                        {((selectedPack?.credits ?? 0) + (selectedPack?.bonusCredits ?? 0)).toLocaleString()} credits
+                        {((selectedPack?.credits ?? 0) + (selectedPack?.bonusCredits ?? 0)).toLocaleString()} {t.credits.creditsLabel}
                       </Text>
                     </View>
                     <Text style={styles.summaryPrice}>
@@ -397,7 +399,7 @@ export default function CreditsScreen() {
                   </View>
 
                   {/* Provider selector */}
-                  <Text style={styles.inputLabel}>Payment Method</Text>
+                  <Text style={styles.inputLabel}>{t.credits.paymentMethod}</Text>
                   <View style={styles.providerRow}>
                     {PROVIDERS.map((p) => (
                       <TouchableOpacity
@@ -421,21 +423,21 @@ export default function CreditsScreen() {
                   </View>
 
                   {/* Phone input */}
-                  <Text style={[styles.inputLabel, { marginTop: 14 }]}>Mobile Money Number</Text>
+                  <Text style={[styles.inputLabel, { marginTop: 14 }]}>{t.credits.mobileMoneyNumber}</Text>
                   <View style={styles.inputRow}>
                     <Ionicons name="phone-portrait-outline" size={18} color={c.textMuted} style={{ marginRight: 8 }} />
                     <TextInput
                       style={styles.input}
                       value={phone}
                       onChangeText={setPhone}
-                      placeholder="e.g. 6XXXXXXXX"
+                      placeholder={t.credits.phoneInputPlaceholder}
                       placeholderTextColor={c.textDim}
                       keyboardType="phone-pad"
                       maxLength={15}
                     />
                   </View>
                   <Text style={styles.inputHint}>
-                    {provider === 'MTN' ? 'MTN MoMo' : 'Orange Money'} number (Cameroon)
+                    {provider === 'MTN' ? t.credits.providerMtnLabel : t.credits.providerOrangeLabel} {t.credits.numberHintSuffix}
                   </Text>
 
                   <TouchableOpacity
@@ -450,14 +452,14 @@ export default function CreditsScreen() {
                       <>
                         <Ionicons name="flash" size={16} color="#fff" />
                         <Text style={styles.buyBtnTextPopular}>
-                          Pay {selectedPack?.price.toLocaleString()} {selectedPack?.currency}
+                          {t.credits.payPrefix} {selectedPack?.price.toLocaleString()} {selectedPack?.currency}
                         </Text>
                       </>
                     )}
                   </TouchableOpacity>
 
                   <Text style={styles.pushHint}>
-                    You'll receive a push notification to approve on your phone.
+                    {t.credits.pushHint}
                   </Text>
                 </>
               )}

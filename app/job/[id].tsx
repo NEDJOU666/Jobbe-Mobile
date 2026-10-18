@@ -11,15 +11,12 @@ import { useJob } from '@/hooks/useJobs';
 import { useToggleSave, useSaved } from '@/hooks/useSaved';
 import { useCheckApplied } from '@/hooks/useApplications';
 import { useCredits } from '@/hooks/useCredits';
+import { useT } from '@/hooks/useT';
 
-const EMP: Record<string, string> = { FULL_TIME: 'Full-time', PART_TIME: 'Part-time', CONTRACT: 'Contract', INTERNSHIP: 'Internship' };
-const LOC: Record<string, string> = { REMOTE: 'Remote', ONSITE: 'On-site', HYBRID: 'Hybrid' };
-const LVL: Record<string, string> = { JUNIOR: 'Junior', MID: 'Mid-level', SENIOR: 'Senior', STUDENT: 'Student' };
-
-function daysLeft(iso: string) {
+function daysLeft(iso: string, t: ReturnType<typeof useT>['t']) {
   const diff = new Date(iso).getTime() - Date.now();
   const d = Math.ceil(diff / 86400000);
-  return d > 0 ? `${d} days left` : 'Deadline passed';
+  return d > 0 ? `${d}${t.jobDetail.daysLeftSuffix}` : t.jobDetail.deadlinePassed;
 }
 
 export default function JobDetailScreen() {
@@ -28,6 +25,11 @@ export default function JobDetailScreen() {
   const { colors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
   const qc = useQueryClient();
+  const { t } = useT();
+
+  const EMP: Record<string, string> = { FULL_TIME: t.jobDetail.employmentFullTime, PART_TIME: t.jobDetail.employmentPartTime, CONTRACT: t.jobDetail.employmentContract, INTERNSHIP: t.jobDetail.employmentInternship };
+  const LOC: Record<string, string> = { REMOTE: t.jobDetail.locationRemote, ONSITE: t.jobDetail.locationOnsite, HYBRID: t.jobDetail.locationHybrid };
+  const LVL: Record<string, string> = { JUNIOR: t.jobDetail.levelJunior, MID: t.jobDetail.levelMid, SENIOR: t.jobDetail.levelSenior, STUDENT: t.jobDetail.levelStudent };
 
   const { data: job, isLoading, isError } = useJob(id ?? '');
   const { data: savedJobs = [] } = useSaved();
@@ -95,9 +97,9 @@ export default function JobDetailScreen() {
     return (
       <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: insets.top }]}>
         <Ionicons name="cloud-offline-outline" size={48} color={c.border3} />
-        <Text style={{ color: c.textMuted }}>Could not load job</Text>
+        <Text style={{ color: c.textMuted }}>{t.jobDetail.loadErrorText}</Text>
         <TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 20, paddingVertical: 10, backgroundColor: c.accentBg, borderRadius: 10 }}>
-          <Text style={{ color: c.accent, fontWeight: '600' }}>Go back</Text>
+          <Text style={{ color: c.accent, fontWeight: '600' }}>{t.jobDetail.goBackButton}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -163,7 +165,7 @@ export default function JobDetailScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
           <View style={styles.chipsRow}>
             {postType === 'INTERNSHIP' && (
-              <View style={[styles.chip, styles.internshipChip]}><Text style={[styles.chipText, styles.internshipChipText]}>Internship</Text></View>
+              <View style={[styles.chip, styles.internshipChip]}><Text style={[styles.chipText, styles.internshipChipText]}>{t.jobDetail.internshipChip}</Text></View>
             )}
             {[EMP[employmentType], LOC[locationType], experienceLevel ? LVL[experienceLevel] : null].filter(Boolean).map((chip) => (
               <View key={chip} style={styles.chip}><Text style={styles.chipText}>{chip}</Text></View>
@@ -171,7 +173,7 @@ export default function JobDetailScreen() {
             {creditCost > 0 && (
               <View style={styles.creditChip}>
                 <Ionicons name="wallet-outline" size={12} color="#92400e" />
-                <Text style={styles.creditChipText}>{creditCost} credit{creditCost !== 1 ? 's' : ''} to apply</Text>
+                <Text style={styles.creditChipText}>{creditCost} {creditCost !== 1 ? t.jobDetail.creditUnitPlural : t.jobDetail.creditUnitSingular} {t.jobDetail.toApplySuffix}</Text>
               </View>
             )}
           </View>
@@ -183,7 +185,7 @@ export default function JobDetailScreen() {
             <Ionicons name="cash-outline" size={18} color={c.accent} />
             <Text style={styles.salaryText}>
               {currency} {salaryMin.toLocaleString()}{salaryMax ? ` – ${salaryMax.toLocaleString()}` : ''}
-              <Text style={styles.salaryPeriod}> / month</Text>
+              <Text style={styles.salaryPeriod}>{t.jobDetail.monthSuffix}</Text>
             </Text>
           </View>
         )}
@@ -192,19 +194,19 @@ export default function JobDetailScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Ionicons name="people-outline" size={16} color={c.textBody} />
-            <Text style={styles.statText}>{_count?.applications ?? 0} applied</Text>
+            <Text style={styles.statText}>{_count?.applications ?? 0}{t.jobDetail.appliedCountSuffix}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Ionicons name="eye-outline" size={16} color={c.textBody} />
-            <Text style={styles.statText}>{viewCount} views</Text>
+            <Text style={styles.statText}>{viewCount}{t.jobDetail.viewsCountSuffix}</Text>
           </View>
           {applicationDeadline && (
             <>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Ionicons name="time-outline" size={16} color="#E65100" />
-                <Text style={[styles.statText, { color: '#E65100' }]}>{daysLeft(applicationDeadline)}</Text>
+                <Text style={[styles.statText, { color: '#E65100' }]}>{daysLeft(applicationDeadline, t)}</Text>
               </View>
             </>
           )}
@@ -212,14 +214,14 @@ export default function JobDetailScreen() {
 
         {/* Description */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About the role</Text>
+          <Text style={styles.sectionTitle}>{t.jobDetail.aboutRoleTitle}</Text>
           <Text style={styles.sectionBody}>{description}</Text>
         </View>
 
         {/* Requirements */}
         {requirements.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Requirements</Text>
+            <Text style={styles.sectionTitle}>{t.jobDetail.requirementsTitle}</Text>
             {requirements.map((r: string, i: number) => (
               <View key={i} style={styles.reqRow}>
                 <View style={styles.reqDot} />
@@ -232,7 +234,7 @@ export default function JobDetailScreen() {
         {/* Skills */}
         {skills.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Skills & Technologies</Text>
+            <Text style={styles.sectionTitle}>{t.jobDetail.skillsTitle}</Text>
             <View style={styles.skillsGrid}>
               {skills.map((s: string) => (
                 <View key={s} style={styles.skillChip}><Text style={styles.skillText}>{s}</Text></View>
@@ -244,7 +246,7 @@ export default function JobDetailScreen() {
         {/* Benefits */}
         {benefits.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Benefits & Perks</Text>
+            <Text style={styles.sectionTitle}>{t.jobDetail.benefitsTitle}</Text>
             <View style={styles.skillsGrid}>
               {benefits.map((b: string) => (
                 <View key={b} style={styles.benefitChip}>
@@ -259,7 +261,7 @@ export default function JobDetailScreen() {
         {/* Education requirement */}
         {education ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Education</Text>
+            <Text style={styles.sectionTitle}>{t.jobDetail.educationTitle}</Text>
             <View style={styles.infoBox}>
               <Ionicons name="school-outline" size={18} color={c.accent} />
               <Text style={styles.infoBoxText}>{education}</Text>
@@ -270,7 +272,7 @@ export default function JobDetailScreen() {
         {/* Experience requirement */}
         {experience ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Experience</Text>
+            <Text style={styles.sectionTitle}>{t.jobDetail.experienceTitle}</Text>
             <View style={styles.infoBox}>
               <Ionicons name="briefcase-outline" size={18} color={c.accent} />
               <Text style={styles.infoBoxText}>{experience}</Text>
@@ -285,20 +287,20 @@ export default function JobDetailScreen() {
             companyAbout the AI could pull from the posting itself, plus the
             post's own location. */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About {displayCompany}</Text>
+          <Text style={styles.sectionTitle}>{t.jobDetail.aboutCompanyPrefix}{displayCompany}</Text>
           {isScraped ? (
             <>
               {companyAbout ? (
                 <Text style={[styles.sectionBody, { marginBottom: 12 }]}>{companyAbout}</Text>
               ) : (
                 <Text style={[styles.sectionBody, { marginBottom: 12, fontStyle: 'italic', opacity: 0.7 }]}>
-                  No company description available for this listing.
+                  {t.jobDetail.noCompanyDescription}
                 </Text>
               )}
               <View style={styles.firmGridItem}>
                 <Ionicons name="location-outline" size={16} color={c.accent} />
                 <View>
-                  <Text style={styles.firmGridLabel}>Location</Text>
+                  <Text style={styles.firmGridLabel}>{t.jobDetail.locationLabel}</Text>
                   <Text style={styles.firmGridValue}>{location || '—'}</Text>
                 </View>
               </View>
@@ -306,10 +308,10 @@ export default function JobDetailScreen() {
           ) : (
             <View style={styles.firmGrid}>
               {[
-                { icon: 'location-outline',  label: 'Location', value: firm.city },
-                { icon: 'people-outline',    label: 'Team size', value: (firm as any).size ?? '—' },
-                { icon: 'briefcase-outline', label: 'Industry',  value: (firm as any).domain_role },
-                { icon: 'globe-outline',     label: 'Country',   value: firm.country },
+                { icon: 'location-outline',  label: t.jobDetail.locationLabel, value: firm.city },
+                { icon: 'people-outline',    label: t.jobDetail.teamSizeLabel, value: (firm as any).size ?? '—' },
+                { icon: 'briefcase-outline', label: t.jobDetail.industryLabel,  value: (firm as any).domain_role },
+                { icon: 'globe-outline',     label: t.jobDetail.countryLabel,   value: firm.country },
               ].map(({ icon, label, value }) => (
                 <View key={label} style={styles.firmGridItem}>
                   <Ionicons name={icon as any} size={16} color={c.accent} />
@@ -336,7 +338,7 @@ export default function JobDetailScreen() {
           <View style={[styles.applyBtn, styles.appliedBtn]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Ionicons name="checkmark-circle" size={18} color={c.accent} />
-              <Text style={[styles.applyBtnText, { color: c.accent }]}>Applied</Text>
+              <Text style={[styles.applyBtnText, { color: c.accent }]}>{t.jobDetail.appliedBadge}</Text>
             </View>
           </View>
         ) : (
@@ -347,7 +349,7 @@ export default function JobDetailScreen() {
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={styles.applyBtnText}>
-                {!canAfford ? 'Buy Credits' : applyType === 'EXTERNAL' ? 'Apply on Website' : 'Apply Now'}
+                {!canAfford ? t.jobDetail.buyCreditsButton : applyType === 'EXTERNAL' ? t.jobDetail.applyOnWebsiteButton : t.jobDetail.applyNowButton}
               </Text>
               {applyType === 'EXTERNAL' && canAfford && (
                 <Ionicons name="open-outline" size={15} color="#fff" />
@@ -356,8 +358,8 @@ export default function JobDetailScreen() {
             {creditCost > 0 && (
               <Text style={styles.applyBtnSub}>
                 {canAfford
-                  ? `· ${creditCost} credit${creditCost !== 1 ? 's' : ''}${creditBalance !== null ? `  ·  balance: ${creditBalance}` : ''}`
-                  : `Need ${creditCost} credit${creditCost !== 1 ? 's' : ''} to apply`}
+                  ? `· ${creditCost} ${creditCost !== 1 ? t.jobDetail.creditUnitPlural : t.jobDetail.creditUnitSingular}${creditBalance !== null ? `  ·  ${t.jobDetail.balanceLabel}: ${creditBalance}` : ''}`
+                  : `${t.jobDetail.needPrefix}${creditCost} ${creditCost !== 1 ? t.jobDetail.creditUnitPlural : t.jobDetail.creditUnitSingular}${t.jobDetail.needSuffix}`}
               </Text>
             )}
           </TouchableOpacity>

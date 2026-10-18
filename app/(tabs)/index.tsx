@@ -10,19 +10,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import { useJobsFeed } from '@/hooks/useJobs';
+import { useT } from '@/hooks/useT';
 import { JobCard } from '@/components/JobCard';
 import { DrawerMenu } from '@/components/DrawerMenu';
 
 type SortMode = 'all' | 'recent' | 'popular';
 
-const TABS: { mode: SortMode; label: string }[] = [
-  { mode: 'all',     label: 'All' },
-  { mode: 'recent',  label: 'Most Recent' },
-  { mode: 'popular', label: 'Most Applied' },
-];
-
 export default function JobsScreen() {
   const { user } = useAuth();
+  const { t } = useT();
   const { colors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -48,6 +44,12 @@ export default function JobsScreen() {
     hasNextPage,
     isFetchingNextPage,
   } = useJobsFeed(feedParams);
+
+  const TABS: { mode: SortMode; label: string }[] = [
+    { mode: 'all',     label: t.jobsFeed.sortAll },
+    { mode: 'recent',  label: t.jobsFeed.sortRecent },
+    { mode: 'popular', label: t.jobsFeed.sortPopular },
+  ];
 
   const avatarUri = (user as any)?.profile_image ?? (user as any)?.avatar ?? null;
   const initial = user?.name?.charAt(0).toUpperCase() ?? '?';
@@ -97,7 +99,7 @@ export default function JobsScreen() {
             ? <Image source={{ uri: avatarUri }} style={{ width: 44, height: 44, borderRadius: 22 }} />
             : <Text style={styles.avatarText}>{initial}</Text>}
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Jobs</Text>
+        <Text style={styles.headerTitle}>{t.jobsFeed.title}</Text>
         <TouchableOpacity style={styles.moreBtn} onPress={() => router.push('/settings')}>
           <Ionicons name="ellipsis-vertical" size={20} color={c.icon} />
         </TouchableOpacity>
@@ -109,7 +111,7 @@ export default function JobsScreen() {
           <Ionicons name="search-outline" size={18} color={c.textMuted} style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search for jobs"
+            placeholder={t.jobsFeed.searchPlaceholder}
             placeholderTextColor={c.textMuted}
             value={search}
             onChangeText={handleSearch}
@@ -147,9 +149,9 @@ export default function JobsScreen() {
       ) : isError ? (
         <View style={styles.center}>
           <Ionicons name="cloud-offline-outline" size={48} color={c.border3} />
-          <Text style={styles.emptyText}>Could not load jobs</Text>
+          <Text style={styles.emptyText}>{t.jobsFeed.loadError}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t.jobsFeed.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -161,9 +163,9 @@ export default function JobsScreen() {
             jobs.length > 0 ? (
               <Text style={styles.feedHint}>
                 {sortMode === 'popular'
-                  ? `${jobs.length} job${jobs.length !== 1 ? 's' : ''} with applications`
-                  : `${total} job${total !== 1 ? 's' : ''} found`}
-                {debouncedSearch ? ` for "${debouncedSearch}"` : ''}
+                  ? `${jobs.length} ${t.jobsFeed.jobsWithApplications}`
+                  : `${total} ${t.jobsFeed.jobsFound}`}
+                {debouncedSearch ? ` ${t.jobsFeed.searchingFor} "${debouncedSearch}"` : ''}
               </Text>
             ) : null
           }
@@ -175,7 +177,7 @@ export default function JobsScreen() {
           ListEmptyComponent={
             <View style={styles.center}>
               <Ionicons name="search-outline" size={48} color={c.border3} />
-              <Text style={styles.emptyText}>No jobs found</Text>
+              <Text style={styles.emptyText}>{t.jobsFeed.emptyState}</Text>
             </View>
           }
           refreshControl={

@@ -1,15 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
-function timeAgo(iso: string) {
+function timeAgo(iso: string, t: any) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return t.inbox.justNow;
+  if (m < 60) return `${m}${t.inbox.minutesAgoSuffix}`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return `${h}${t.inbox.hoursAgoSuffix}`;
   const d = Math.floor(h / 24);
-  return d === 1 ? 'Yesterday' : `${d}d ago`;
+  return d === 1 ? t.inbox.yesterday : `${d}${t.inbox.daysAgoSuffix}`;
 }
 import { useMemo, useRef, useState } from 'react';
 import {
@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
+import { useT } from '@/hooks/useT';
 import {
   useInboxThreads, useThreadMessages, useSendMessage, useMarkThreadRead,
   type InboxThread,
@@ -28,6 +29,7 @@ export default function InboxScreen() {
   const { user } = useAuth();
   const { colors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const { t } = useT();
   const [selected, setSelected] = useState<InboxThread | null>(null);
   const [newMsg, setNewMsg] = useState('');
   const scrollRef = useRef<ScrollView>(null);
@@ -88,7 +90,7 @@ export default function InboxScreen() {
             ) : messages.length === 0 ? (
               <View style={{ alignItems: 'center', paddingTop: 60, gap: 8 }}>
                 <Ionicons name="chatbubble-outline" size={40} color={c.border3} />
-                <Text style={{ color: c.textMuted, fontSize: 14 }}>No messages yet. Say hello!</Text>
+                <Text style={{ color: c.textMuted, fontSize: 14 }}>{t.inbox.noMessagesInThread}</Text>
               </View>
             ) : (
               messages.map((msg) => {
@@ -104,14 +106,14 @@ export default function InboxScreen() {
                     </View>
                     <View style={[styles.msgBubbleWrap, isMe && { alignItems: 'flex-end' }]}>
                       <Text style={[styles.msgSender, isMe && { textAlign: 'right', color: c.textMuted }]}>
-                        {isMe ? 'You' : msg.sender.name}
+                        {isMe ? t.inbox.youLabel : msg.sender.name}
                       </Text>
                       <View style={[styles.msgBubble, isMe ? styles.msgBubbleMe : styles.msgBubbleThem]}>
                         <Text style={[styles.msgText, isMe && { color: '#fff' }]}>{msg.body}</Text>
                       </View>
                       <Text style={[styles.msgTime, isMe && { textAlign: 'right' }]}>
-                        {timeAgo(msg.createdAt)}
-                        {msg.readAt && isMe && <Text style={{ color: c.accent }}> · Read</Text>}
+                        {timeAgo(msg.createdAt, t)}
+                        {msg.readAt && isMe && <Text style={{ color: c.accent }}> · {t.inbox.readLabel}</Text>}
                       </Text>
                     </View>
                   </View>
@@ -126,7 +128,7 @@ export default function InboxScreen() {
               style={styles.input}
               value={newMsg}
               onChangeText={setNewMsg}
-              placeholder="Type a message..."
+              placeholder={t.inbox.typeMessagePlaceholder}
               placeholderTextColor={c.textMuted}
               multiline
               returnKeyType="send"
@@ -153,7 +155,7 @@ export default function InboxScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={c.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Inbox</Text>
+        <Text style={styles.title}>{t.inbox.inboxTitle}</Text>
         {totalUnread > 0 && (
           <View style={styles.unreadBadge}>
             <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
@@ -168,9 +170,9 @@ export default function InboxScreen() {
       ) : threads.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32 }}>
           <Ionicons name="chatbubbles-outline" size={52} color={c.border3} />
-          <Text style={{ color: c.textMuted, fontSize: 16, fontWeight: '600' }}>No messages yet</Text>
+          <Text style={{ color: c.textMuted, fontSize: 16, fontWeight: '600' }}>{t.inbox.noMessagesTitle}</Text>
           <Text style={{ color: c.textDim, fontSize: 13, textAlign: 'center' }}>
-            Once a recruiter contacts you about your application, conversations will appear here.
+            {t.inbox.noMessagesHint}
           </Text>
         </View>
       ) : (
@@ -195,14 +197,14 @@ export default function InboxScreen() {
                   </Text>
                   {item.lastMessage && (
                     <Text style={styles.threadTime}>
-                      {timeAgo(item.lastMessage.createdAt)}
+                      {timeAgo(item.lastMessage.createdAt, t)}
                     </Text>
                   )}
                 </View>
                 <Text style={styles.threadPost} numberOfLines={1}>{item.postTitle}</Text>
                 {item.lastMessage && (
                   <Text style={[styles.threadPreview, item.unreadCount > 0 && { color: c.textSub, fontWeight: '600' }]} numberOfLines={1}>
-                    {item.lastMessage.senderId === user?.id ? 'You: ' : ''}{item.lastMessage.body}
+                    {item.lastMessage.senderId === user?.id ? t.inbox.youPrefix : ''}{item.lastMessage.body}
                   </Text>
                 )}
               </View>

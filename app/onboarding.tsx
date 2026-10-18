@@ -1,23 +1,28 @@
 import { api, API_URL } from '@/lib/api';
 import { secureStorage } from '@/utils/secureStorage';
+import { useT } from '@/hooks/useT';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, BackHandler, KeyboardAvoidingView, Platform,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const STEPS = [
-  { id: 'basic',  title: 'Basic Info',    subtitle: 'Tell us who you are',          icon: 'person-outline' },
-  { id: 'about',  title: 'About You',     subtitle: 'A short professional summary',  icon: 'document-text-outline' },
-  { id: 'skills', title: 'Your Skills',   subtitle: 'What are you good at?',         icon: 'flash-outline' },
-  { id: 'career', title: 'Career Prefs',  subtitle: 'Your work preferences & CV',   icon: 'briefcase-outline' },
-] as const;
+function getSteps(t: ReturnType<typeof useT>['t']) {
+  return [
+    { id: 'basic',  title: t.onboarding.stepBasicTitle,    subtitle: t.onboarding.stepBasicSubtitle,          icon: 'person-outline' },
+    { id: 'about',  title: t.onboarding.stepAboutTitle,     subtitle: t.onboarding.stepAboutSubtitle,  icon: 'document-text-outline' },
+    { id: 'skills', title: t.onboarding.stepSkillsTitle,   subtitle: t.onboarding.stepSkillsSubtitle,         icon: 'flash-outline' },
+    { id: 'career', title: t.onboarding.stepCareerTitle,  subtitle: t.onboarding.stepCareerSubtitle,   icon: 'briefcase-outline' },
+  ] as const;
+}
 
 export default function OnboardingScreen() {
+  const { t } = useT();
+  const STEPS = useMemo(() => getSteps(t), [t]);
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
 
@@ -60,7 +65,7 @@ export default function OnboardingScreen() {
       setCvName(asset.name);
       setCvMime(asset.mimeType ?? 'application/pdf');
     } catch {
-      Alert.alert('Error', 'Could not open document picker');
+      Alert.alert(t.onboarding.errorTitle, t.onboarding.pickerErrorMessage);
     }
   };
 
@@ -78,7 +83,7 @@ export default function OnboardingScreen() {
         body: form,
       });
     } catch {
-      Alert.alert('Upload Failed', 'Could not upload your CV. You can add it later from your profile.');
+      Alert.alert(t.onboarding.uploadFailedTitle, t.onboarding.uploadFailedMessage);
     } finally {
       setUploading(false);
     }
@@ -138,7 +143,7 @@ export default function OnboardingScreen() {
         <View style={styles.header}>
           <Text style={styles.appName}>JobFinder</Text>
           <TouchableOpacity onPress={goSkip}>
-            <Text style={styles.skipBtn}>{step === STEPS.length - 1 ? 'Skip & finish' : 'Skip'}</Text>
+            <Text style={styles.skipBtn}>{step === STEPS.length - 1 ? t.onboarding.skipFinish : t.onboarding.skip}</Text>
           </TouchableOpacity>
         </View>
 
@@ -170,18 +175,18 @@ export default function OnboardingScreen() {
           {step === 0 && (
             <View style={styles.form}>
               <View style={styles.field}>
-                <Text style={styles.label}>Full Name</Text>
-                <TextInput style={styles.input} placeholder="e.g. John Smith" placeholderTextColor="#555"
+                <Text style={styles.label}>{t.onboarding.fullName}</Text>
+                <TextInput style={styles.input} placeholder={t.onboarding.fullNamePlaceholder} placeholderTextColor="#555"
                   value={name} onChangeText={setName} />
               </View>
               <View style={styles.field}>
-                <Text style={styles.label}>Location <Text style={styles.optional}>(optional)</Text></Text>
-                <TextInput style={styles.input} placeholder="e.g. Yaoundé, Cameroon" placeholderTextColor="#555"
+                <Text style={styles.label}>{t.onboarding.location} <Text style={styles.optional}>{t.onboarding.optional}</Text></Text>
+                <TextInput style={styles.input} placeholder={t.onboarding.locationPlaceholder} placeholderTextColor="#555"
                   value={location} onChangeText={setLocation} />
               </View>
               <View style={styles.field}>
-                <Text style={styles.label}>Phone <Text style={styles.optional}>(optional)</Text></Text>
-                <TextInput style={styles.input} placeholder="+237 6XX XXX XXX" placeholderTextColor="#555"
+                <Text style={styles.label}>{t.onboarding.phone} <Text style={styles.optional}>{t.onboarding.optional}</Text></Text>
+                <TextInput style={styles.input} placeholder={t.onboarding.phonePlaceholder} placeholderTextColor="#555"
                   value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
               </View>
             </View>
@@ -191,19 +196,19 @@ export default function OnboardingScreen() {
           {step === 1 && (
             <View style={styles.form}>
               <View style={styles.field}>
-                <Text style={styles.label}>Professional Headline <Text style={styles.optional}>(optional)</Text></Text>
-                <TextInput style={styles.input} placeholder="e.g. Full-Stack Developer" placeholderTextColor="#555"
-                  value={headline} onChangeText={(t) => t.length <= 160 && setHeadline(t)} />
+                <Text style={styles.label}>{t.onboarding.headline} <Text style={styles.optional}>{t.onboarding.optional}</Text></Text>
+                <TextInput style={styles.input} placeholder={t.onboarding.headlinePlaceholder} placeholderTextColor="#555"
+                  value={headline} onChangeText={(v) => v.length <= 160 && setHeadline(v)} />
                 <Text style={styles.charCount}>{headline.length}/160</Text>
               </View>
               <View style={styles.field}>
-                <Text style={styles.label}>Bio <Text style={styles.optional}>(optional)</Text></Text>
+                <Text style={styles.label}>{t.onboarding.bio} <Text style={styles.optional}>{t.onboarding.optional}</Text></Text>
                 <TextInput
                   style={[styles.input, styles.textarea]}
-                  placeholder="Tell recruiters about yourself…"
+                  placeholder={t.onboarding.bioPlaceholder}
                   placeholderTextColor="#555"
                   value={bio}
-                  onChangeText={(t) => t.length <= 1000 && setBio(t)}
+                  onChangeText={(v) => v.length <= 1000 && setBio(v)}
                   multiline
                   numberOfLines={5}
                   textAlignVertical="top"
@@ -217,11 +222,11 @@ export default function OnboardingScreen() {
           {step === 2 && (
             <View style={styles.form}>
               <View style={styles.field}>
-                <Text style={styles.label}>Add Skills</Text>
+                <Text style={styles.label}>{t.onboarding.addSkills}</Text>
                 <View style={styles.skillInputRow}>
                   <TextInput
                     style={[styles.input, { flex: 1 }]}
-                    placeholder="e.g. React, Python…"
+                    placeholder={t.onboarding.skillPlaceholder}
                     placeholderTextColor="#555"
                     value={skillInput}
                     onChangeText={setSkillInput}
@@ -246,7 +251,7 @@ export default function OnboardingScreen() {
                 </View>
               )}
               {skills.length === 0 && (
-                <Text style={styles.emptyHint}>No skills yet — type one above and tap +</Text>
+                <Text style={styles.emptyHint}>{t.onboarding.noSkillsHint}</Text>
               )}
             </View>
           )}
@@ -256,8 +261,8 @@ export default function OnboardingScreen() {
             <View style={styles.form}>
               <View style={styles.toggleRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Open to Work</Text>
-                  <Text style={styles.toggleHint}>Let recruiters know you're actively looking</Text>
+                  <Text style={styles.label}>{t.onboarding.openToWork}</Text>
+                  <Text style={styles.toggleHint}>{t.onboarding.openToWorkHint}</Text>
                 </View>
                 <TouchableOpacity
                   style={[styles.toggle, openToWork && styles.toggleOn]}
@@ -269,7 +274,7 @@ export default function OnboardingScreen() {
               </View>
 
               <View style={styles.field}>
-                <Text style={styles.label}>Upload CV / Resume <Text style={styles.optional}>(optional)</Text></Text>
+                <Text style={styles.label}>{t.onboarding.uploadCv} <Text style={styles.optional}>{t.onboarding.optional}</Text></Text>
                 {cvName ? (
                   <View style={styles.cvCard}>
                     <Ionicons name="document-text-outline" size={22} color="#14A800" />
@@ -281,12 +286,12 @@ export default function OnboardingScreen() {
                 ) : (
                   <TouchableOpacity style={styles.cvPicker} onPress={pickCv} activeOpacity={0.75}>
                     <Ionicons name="cloud-upload-outline" size={28} color="#555" />
-                    <Text style={styles.cvPickerText}>Tap to select CV</Text>
-                    <Text style={styles.cvPickerHint}>PDF, DOC, DOCX</Text>
+                    <Text style={styles.cvPickerText}>{t.onboarding.cvPickerText}</Text>
+                    <Text style={styles.cvPickerHint}>{t.onboarding.cvPickerHint}</Text>
                   </TouchableOpacity>
                 )}
                 <Text style={styles.cvNote}>
-                  Your CV is saved to your profile and can be reused in every application.
+                  {t.onboarding.cvNote}
                 </Text>
               </View>
             </View>
@@ -308,7 +313,7 @@ export default function OnboardingScreen() {
             ) : (
               <>
                 <Text style={styles.nextBtnText}>
-                  {step === STEPS.length - 1 ? 'Finish Setup' : 'Continue'}
+                  {step === STEPS.length - 1 ? t.onboarding.finishSetup : t.onboarding.continueBtn}
                 </Text>
                 <Ionicons name={step === STEPS.length - 1 ? 'checkmark' : 'arrow-forward'} size={18} color="#fff" style={{ marginLeft: 8 }} />
               </>
