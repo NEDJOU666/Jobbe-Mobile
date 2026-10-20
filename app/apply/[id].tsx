@@ -1,5 +1,4 @@
 import { useApply } from '@/hooks/useApplications';
-import { useCredits } from '@/hooks/useCredits';
 import { useDocuments } from '@/hooks/useDocuments';
 import { useJob } from '@/hooks/useJobs';
 import { useTheme } from '@/hooks/useTheme';
@@ -25,7 +24,6 @@ export default function ApplyScreen() {
 
   const { data: job } = useJob(postId);
   const { data: docs = [] } = useDocuments();
-  const { data: creditsData } = useCredits();
   const { mutate: apply, isPending } = useApply();
 
   const resumes = useMemo(() => docs.filter((d) => d.documentType === 'RESUME'), [docs]);
@@ -51,7 +49,6 @@ export default function ApplyScreen() {
   const selectedDocs = docs.filter((d) => selectedDocIds.includes(d.id));
   const goNext = () => setStep((s) => s + 1);
   const goBack = () => { if (step === 0) router.back(); else setStep((s) => s - 1); };
-  const creditBalance = creditsData?.balance ?? 0;
 
   // Hardware back button: step backwards through wizard instead of exiting
   useEffect(() => {
@@ -193,7 +190,6 @@ export default function ApplyScreen() {
               : (job?.firm?.name ?? '—')}
             isScrapedNoEmail={!!(job as any)?.source && !(job as any)?.properties?.applyEmail}
             sourceUrl={(job as any)?.sourceUrl}
-            creditBalance={creditBalance}
           />
         )}
         <View style={{ height: 110 }} />
@@ -213,9 +209,9 @@ export default function ApplyScreen() {
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[styles.nextBtn, (isPending || (creditsData !== undefined && creditBalance < 1)) && styles.btnDisabled]}
+            style={[styles.nextBtn, isPending && styles.btnDisabled]}
             activeOpacity={0.85}
-            disabled={isPending || (creditsData !== undefined && creditBalance < 1)}
+            disabled={isPending}
             onPress={handleSubmit}
           >
             {isPending
@@ -364,38 +360,16 @@ function StepCoverLetter({ c, styles, t, coverLetter, onChangeCover, salaryExpec
   );
 }
 
-function StepReview({ c, styles, t, selectedDocs, coverLetter, salaryExpectation, jobTitle, firm, isScrapedNoEmail, sourceUrl, creditBalance }: {
+function StepReview({ c, styles, t, selectedDocs, coverLetter, salaryExpectation, jobTitle, firm, isScrapedNoEmail, sourceUrl }: {
   c: any; styles: any; t: any;
   selectedDocs: any[];
   coverLetter: string; salaryExpectation: string; jobTitle: string; firm: string;
-  isScrapedNoEmail?: boolean; sourceUrl?: string; creditBalance: number;
+  isScrapedNoEmail?: boolean; sourceUrl?: string;
 }) {
-  const APPLY_COST = 1;
-  const hasEnough = creditBalance >= APPLY_COST;
-
   return (
     <View style={{ gap: 14 }}>
       <Text style={styles.sectionTitle}>{t.applyForm.reviewTitle}</Text>
       <Text style={styles.sectionHint}>{t.applyForm.reviewHint}</Text>
-
-      {/* Credit cost banner */}
-      <View style={[styles.creditCard, !hasEnough && styles.creditCardWarn]}>
-        <Ionicons name="wallet-outline" size={18} color={hasEnough ? c.accent : '#E65100'} />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.creditCost, !hasEnough && { color: '#E65100' }]}>
-            {APPLY_COST}{t.applyForm.creditWillBeSpentSuffix}
-          </Text>
-          <Text style={[styles.creditBalance, !hasEnough && { color: '#E65100' }]}>
-            {t.applyForm.yourBalancePrefix}<Text style={{ fontWeight: '800' }}>{creditBalance}</Text>{t.applyForm.creditsSuffix}
-            {!hasEnough ? t.applyForm.notEnoughSuffix : ''}
-          </Text>
-        </View>
-        {!hasEnough && (
-          <TouchableOpacity onPress={() => router.push('/credits')} activeOpacity={0.8}>
-            <Text style={{ color: '#E65100', fontWeight: '700', fontSize: 12 }}>{t.applyForm.topUpButton}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
 
       {/* Summary rows */}
       <View style={styles.reviewCard}>
@@ -507,10 +481,6 @@ function makeStyles(c: ReturnType<typeof import('@/hooks/useTheme').useTheme>['c
     inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border2, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
     currencyLabel: { color: c.textMuted, fontSize: 14, fontWeight: '700' },
     input: { color: c.text, fontSize: 15 },
-    creditCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.accentBg, borderWidth: 1, borderColor: c.accentBorder, borderRadius: 12, padding: 14 },
-    creditCardWarn: { backgroundColor: '#FFF3E0', borderColor: '#E6510044' },
-    creditCost: { color: c.accent, fontSize: 13, fontWeight: '700' },
-    creditBalance: { color: c.textMuted, fontSize: 12, marginTop: 2 },
     reviewCard: { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: 14, gap: 0, overflow: 'hidden' },
     reviewRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, gap: 16 },
     reviewLabel: { color: c.textMuted, fontSize: 13, flexShrink: 0 },

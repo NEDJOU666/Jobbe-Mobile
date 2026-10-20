@@ -106,9 +106,15 @@ export default function JobDetailScreen() {
   }
 
   const { title, description, postType, employmentType, locationType, location, properties, firm, _count, viewCount, applicationDeadline, applyType, source, sourceUrl } = job;
-  const creditCost: number = job.creditCost ?? 1;
+  // Applying is free platform-wide — mirrors APPLICATION_FEES_ENABLED=false in
+  // the backend's applications.service.ts. Posts still carry a creditCost value
+  // (it's computed at scrape time and kept for when fees come back), so zero it
+  // here rather than per-component: every cost chip and affordability check
+  // below keys off these, and a stale one sent 0-credit users to a purchase
+  // screen for something that no longer costs anything.
+  const creditCost: number = 0;
   const creditBalance = creditsData?.balance ?? null;
-  const canAfford = creditBalance === null || creditBalance >= creditCost;
+  const canAfford: boolean = true;
   const isScraped = !!source;
   const { salaryMin, salaryMax, currency = 'XAF', skills = [], requirements = [], benefits = [], experienceLevel, scrapedCompany, companyAbout, education, experience } = properties ?? {};
   const displayCompany = isScraped && scrapedCompany ? scrapedCompany : firm.name;
